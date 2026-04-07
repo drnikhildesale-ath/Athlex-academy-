@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile and role information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "role": { "type": "string", "enum": ["admin", "student"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Quiz": {
+      "title": "ACE-CPT Quiz",
+      "description": "A quiz containing multiple MCQs for a specific chapter or topic.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "chapter": { "type": "integer" },
+        "difficulty": { "type": "string", "enum": ["Easy", "Medium", "Hard"] },
+        "pointsPerQuestion": { "type": "integer" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "assignedTo": { "type": "array", "items": { "type": "string" }, "description": "List of student UIDs assigned to this quiz." },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "correctAnswer": { "type": "integer" },
+              "explanation": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "questions", "createdAt", "status", "difficulty", "pointsPerQuestion"]
+    },
+    "Score": {
+      "title": "Student Score",
+      "description": "Records a student's performance on a quiz.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "quizId": { "type": "string" },
+        "quizTitle": { "type": "string" },
+        "score": { "type": "integer" },
+        "totalQuestions": { "type": "integer" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "quizId", "score", "totalQuestions", "completedAt"]
+    },
+    "Material": {
+      "title": "Study Material",
+      "description": "Chapter notes or other study resources.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "chapter": { "type": "integer" },
+        "fileUrl": { "type": "string", "format": "uri", "description": "URL to the PDF file or base64 data." },
+        "assignedTo": { "type": "array", "items": { "type": "string" }, "description": "List of student UIDs assigned to this material." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "fileUrl", "createdAt", "createdBy"]
+    },
+    "LiveClass": {
+      "title": "Live Class",
+      "description": "Information about live classes and their recordings.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "link": { "type": "string", "format": "uri" },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "assignedTo": { "type": "array", "items": { "type": "string" }, "description": "List of student UIDs assigned to this class." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "link", "createdAt", "createdBy"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents."
+    },
+    "/quizzes/{quizId}": {
+      "schema": "Quiz",
+      "description": "Collection of available quizzes."
+    },
+    "/scores/{scoreId}": {
+      "schema": "Score",
+      "description": "Student quiz results."
+    },
+    "/materials/{materialId}": {
+      "schema": "Material",
+      "description": "Collection of study materials."
+    },
+    "/liveClasses/{classId}": {
+      "schema": "LiveClass",
+      "description": "Collection of live classes."
+    }
+  }
+}

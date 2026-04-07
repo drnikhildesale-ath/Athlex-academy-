@@ -1,0 +1,188 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId} (Auth UID)
+// Fields:
+//   - uid: string (required) - Firebase Auth UID
+//   - email: string (required, format: email) - User's email
+//   - displayName: string (optional) - User's display name
+//   - photoURL: string (optional, format: uri) - User's photo URL
+//   - role: string (required, enum: ['admin', 'student']) - User's role
+//   - createdAt: timestamp (required) - Account creation time
+//
+// Collection: quizzes
+// Document ID: {quizId} (Auto-generated)
+// Fields:
+//   - title: string (required) - Quiz title
+//   - description: string (optional) - Quiz description
+//   - chapter: number (optional) - ACE-CPT Chapter number
+//   - questions: list (required) - List of MCQ objects
+//   - createdAt: timestamp (required) - Creation time
+//   - createdBy: string (required) - Admin UID
+//
+// Collection: scores
+// Document ID: {scoreId} (Auto-generated)
+// Fields:
+//   - studentId: string (required) - Student's UID
+//   - quizId: string (required) - Quiz UID
+//   - quizTitle: string (required) - Quiz title
+//   - score: number (required) - Number of correct answers
+//   - totalQuestions: number (required) - Total number of questions
+//   - completedAt: timestamp (required) - Completion time
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "drnikhildesale@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'student'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidQuiz(data) {
+      return hasRequiredFields(['title', 'questions', 'createdAt', 'createdBy', 'status', 'difficulty', 'pointsPerQuestion']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.questions is list && data.questions.size() > 0 && data.questions.size() <= 100 &&
+             data.status in ['draft', 'published'] &&
+             data.difficulty in ['Easy', 'Medium', 'Hard'] &&
+             data.pointsPerQuestion is number &&
+             data.createdAt is timestamp &&
+             data.createdBy == request.auth.uid;
+    }
+
+    function isValidScore(data) {
+      return hasRequiredFields(['studentId', 'quizId', 'quizTitle', 'score', 'totalQuestions', 'completedAt']) &&
+             data.studentId == request.auth.uid &&
+             data.quizId is string &&
+             data.quizTitle is string &&
+             data.score is number && data.score >= 0 &&
+             data.totalQuestions is number && data.totalQuestions > 0 &&
+             data.completedAt is timestamp;
+    }
+
+    function isValidMaterial(data) {
+      return hasRequiredFields(['title', 'fileUrl', 'createdAt', 'createdBy']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.fileUrl is string && data.fileUrl.size() > 0 &&
+             data.createdAt is timestamp &&
+             data.createdBy == request.auth.uid;
+    }
+
+    function isValidLiveClass(data) {
+      return hasRequiredFields(['title', 'link', 'createdAt', 'createdBy']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.link is string && data.link.size() > 0 &&
+             data.createdAt is timestamp &&
+             data.createdBy == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Students can only read their own profile. Admins can read all.
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Users can create their own profile as 'student' by default.
+      // Only admins can create other admins.
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) &&
+                    (request.resource.data.role == 'student' || isAdmin());
+      
+      // Users can update their own profile but cannot change their role.
+      // Admins can update any profile.
+      allow update: if isAuthenticated() && 
+                    ((isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin());
+      
+      allow delete: if isAdmin();
+    }
+
+    match /quizzes/{quizId} {
+      // Students can only read quizzes assigned to them that are published.
+      // Admins can read all.
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        (resource.data.status == 'published' && request.auth.uid in resource.data.assignedTo)
+      );
+      
+      // Only admins can create, update, or delete quizzes.
+      allow create: if isAdmin() && isValidQuiz(request.resource.data);
+      allow update: if isAdmin() && isValidQuiz(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /scores/{scoreId} {
+      // Students can read their own scores. Admins can read all.
+      allow read: if isAuthenticated() && (resource.data.studentId == request.auth.uid || isAdmin());
+      
+      // Students can create their own scores.
+      allow create: if isAuthenticated() && isValidScore(request.resource.data);
+      
+      // Scores should be immutable for students.
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /materials/{materialId} {
+      // Students can only read materials assigned to them. Admins can read all.
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid in resource.data.assignedTo);
+      
+      // Only admins can manage materials.
+      allow create: if isAdmin() && isValidMaterial(request.resource.data);
+      allow update: if isAdmin() && isValidMaterial(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /liveClasses/{classId} {
+      // Students can only read classes assigned to them. Admins can read all.
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid in resource.data.assignedTo);
+      
+      // Only admins can manage live classes.
+      allow create: if isAdmin() && isValidLiveClass(request.resource.data);
+      allow update: if isAdmin() && isValidLiveClass(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}
