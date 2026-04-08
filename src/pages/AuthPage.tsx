@@ -14,7 +14,19 @@ export default function AuthPage() {
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       console.error("Login Error:", err);
-      setError(err.message || "Failed to sign in with Google.");
+      let message = "Failed to sign in with Google.";
+      
+      if (err.code === 'auth/unauthorized-domain') {
+        message = "This domain is not authorized in Firebase. Please add this URL to your Firebase Console -> Authentication -> Settings -> Authorized Domains.";
+      } else if (err.code === 'auth/popup-blocked') {
+        message = "The login popup was blocked by your browser. Please allow popups for this site.";
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        message = "The login popup was closed before completion. Please try again.";
+      } else if (err.message) {
+        message = `${err.message} (${err.code})`;
+      }
+      
+      setError(message);
     } finally {
       setLoading(false);
     }

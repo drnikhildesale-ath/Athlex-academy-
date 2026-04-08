@@ -3,7 +3,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, delete
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
-import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video } from 'lucide-react';
+import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -22,6 +22,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [notes, setNotes] = React.useState('');
   const [quizTitle, setQuizTitle] = React.useState('');
   const [chapter, setChapter] = React.useState('1');
+  const [quizType, setQuizType] = React.useState<'ai' | 'google_form'>('ai');
+  const [googleFormUrl, setGoogleFormUrl] = React.useState('');
   const [numQuestions, setNumQuestions] = React.useState(10);
   const [pointsPerQuestion, setPointsPerQuestion] = React.useState(1);
   const [difficulty, setDifficulty] = React.useState('Medium');
@@ -37,7 +39,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   // New Content Forms
   const [materialTitle, setMaterialTitle] = React.useState('');
   const [materialChapter, setMaterialChapter] = React.useState('1');
+  const [materialType, setMaterialType] = React.useState<'pdf' | 'drive'>('pdf');
   const [materialFile, setMaterialFile] = React.useState<string | null>(null);
+  const [driveUrl, setDriveUrl] = React.useState('');
   const [liveClassTitle, setLiveClassTitle] = React.useState('');
   const [liveClassLink, setLiveClassLink] = React.useState('');
   const [liveClassDate, setLiveClassDate] = React.useState('');
@@ -161,26 +165,37 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   };
 
   const handlePublishQuiz = async (isDraft: boolean = false) => {
-    if (!draftQuiz || !quizTitle) return;
+    if (!quizTitle) return;
+    if (quizType === 'ai' && !draftQuiz) return;
+    if (quizType === 'google_form' && !googleFormUrl) return;
 
     try {
-      await addDoc(collection(db, 'quizzes'), {
+      const quizData: any = {
         title: quizTitle,
-        chapter: parseInt(chapter),
-        difficulty,
-        pointsPerQuestion,
+        chapter: chapter,
         status: isDraft ? 'draft' : 'published',
-        assignedTo: [], // Initially assigned to nobody
-        questions: draftQuiz,
+        type: quizType,
+        assignedTo: [],
         createdAt: serverTimestamp(),
         createdBy: user.uid
-      });
+      };
+
+      if (quizType === 'ai') {
+        quizData.difficulty = difficulty;
+        quizData.pointsPerQuestion = pointsPerQuestion;
+        quizData.questions = draftQuiz;
+      } else {
+        quizData.googleFormUrl = googleFormUrl;
+      }
+
+      await addDoc(collection(db, 'quizzes'), quizData);
 
       setNotes('');
       setQuizTitle('');
+      setGoogleFormUrl('');
       setDraftQuiz(null);
       setShowReview(false);
-      setStatus({ type: 'success', message: `Successfully ${isDraft ? 'saved draft' : 'published'} "${quizTitle}"!` });
+      setStatus({ type: 'success', message: `Successfully ${isDraft ? 'saved' : 'published'} "${quizTitle}"!` });
     } catch (err: any) {
       handleFirestoreError(err, OperationType.CREATE, 'quizzes');
     }
@@ -197,20 +212,25 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!materialTitle || !materialFile) return;
+    if (!materialTitle) return;
+    if (materialType === 'pdf' && !materialFile) return;
+    if (materialType === 'drive' && !driveUrl) return;
 
     try {
       await addDoc(collection(db, 'materials'), {
         title: materialTitle,
-        chapter: parseInt(materialChapter),
-        fileUrl: materialFile,
+        chapter: materialChapter,
+        type: materialType,
+        fileUrl: materialType === 'pdf' ? materialFile : null,
+        driveUrl: materialType === 'drive' ? driveUrl : null,
         assignedTo: [],
         createdAt: serverTimestamp(),
         createdBy: user.uid
       });
       setMaterialTitle('');
       setMaterialFile(null);
-      setStatus({ type: 'success', message: "Study material uploaded successfully!" });
+      setDriveUrl('');
+      setStatus({ type: 'success', message: "Study material added successfully!" });
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'materials');
     }
@@ -370,8 +390,27 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Create Signature Quiz</h2>
                 </div>
 
-                <form onSubmit={handleGenerateDraft} className="space-y-6">
-                  {/* ... existing quiz form fields ... */}
+                <form onSubmit={quizType === 'ai' ? handleGenerateDraft : (e) => { e.preventDefault(); handlePublishQuiz(false); }} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Quiz Type</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setQuizType('ai')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${quizType === 'ai' ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-500'}`}
+                      >
+                        AI Generated
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuizType('google_form')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${quizType === 'google_form' ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-500'}`}
+                      >
+                        Google Form
+                      </button>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Quiz Title</label>
                     <input
@@ -384,102 +423,110 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">ACE Chapter</label>
-                      <select
-                        value={chapter}
-                        onChange={(e) => setChapter(e.target.value)}
-                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
-                      >
-                        {Array.from({ length: 16 }, (_, i) => (
-                          <option key={i + 1} value={i + 1}>Chapter {i + 1}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Difficulty</label>
-                      <select
-                        value={difficulty}
-                        onChange={(e) => setDifficulty(e.target.value)}
-                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
-                      >
-                        <option value="Easy">Easy</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Hard">Hard</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Questions</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="50"
-                        value={numQuestions}
-                        onChange={(e) => setNumQuestions(parseInt(e.target.value))}
-                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Points/Q</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={pointsPerQuestion}
-                        onChange={(e) => setPointsPerQuestion(parseInt(e.target.value))}
-                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
-                      />
-                    </div>
-                  </div>
-
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Study Notes (Context)</label>
-                      <div className="flex space-x-2">
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleFileUpload}
-                          accept=".pdf"
-                          className="hidden"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={summarizing}
-                          className="flex items-center space-x-1 text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors disabled:opacity-50"
-                        >
-                          <FileUp className="h-3 w-3" />
-                          <span>Upload PDF</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSummarize}
-                          disabled={!notes || summarizing}
-                          className="flex items-center space-x-1 text-[10px] font-black text-purple-600 uppercase tracking-widest hover:text-purple-700 transition-colors disabled:opacity-50"
-                        >
-                          <Sparkles className="h-3 w-3" />
-                          <span>Summarize</span>
-                        </button>
-                      </div>
-                    </div>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Paste chapter notes, key concepts, or upload a PDF. Athlex Academy's custom engine will curate the best MCQs for your students."
-                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium h-48 resize-none"
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">ACE Chapter(s)</label>
+                    <input
+                      type="text"
+                      value={chapter}
+                      onChange={(e) => setChapter(e.target.value)}
+                      placeholder="e.g. 1 or 1-5"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
                       required
                     />
-                    {summarizing && (
-                      <div className="mt-2 flex items-center space-x-2 text-[10px] font-bold text-slate-400 animate-pulse">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        <span>Processing content...</span>
-                      </div>
-                    )}
                   </div>
+
+                  {quizType === 'ai' ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Difficulty</label>
+                          <select
+                            value={difficulty}
+                            onChange={(e) => setDifficulty(e.target.value)}
+                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                          >
+                            <option value="Easy">Easy</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Hard">Hard</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Questions</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="50"
+                            value={numQuestions}
+                            onChange={(e) => setNumQuestions(parseInt(e.target.value))}
+                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Points/Q</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={pointsPerQuestion}
+                          onChange={(e) => setPointsPerQuestion(parseInt(e.target.value))}
+                          className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Study Notes (Context)</label>
+                          <div className="flex space-x-2">
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              onChange={handleFileUpload}
+                              accept=".pdf"
+                              className="hidden"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={summarizing}
+                              className="flex items-center space-x-1 text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors disabled:opacity-50"
+                            >
+                              <FileUp className="h-3 w-3" />
+                              <span>Upload PDF</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSummarize}
+                              disabled={!notes || summarizing}
+                              className="flex items-center space-x-1 text-[10px] font-black text-purple-600 uppercase tracking-widest hover:text-purple-700 transition-colors disabled:opacity-50"
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              <span>Summarize</span>
+                            </button>
+                          </div>
+                        </div>
+                        <textarea
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          placeholder="Paste notes or upload PDF..."
+                          className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium h-32 resize-none"
+                          required
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Google Form URL</label>
+                      <input
+                        type="url"
+                        value={googleFormUrl}
+                        onChange={(e) => setGoogleFormUrl(e.target.value)}
+                        placeholder="https://docs.google.com/forms/..."
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                        required
+                      />
+                    </div>
+                  )}
 
                   {status && activeTab === 'quizzes' && (
                     <div className={`p-4 rounded-2xl flex items-center space-x-3 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
@@ -503,7 +550,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     ) : (
                       <>
                         <Plus className="h-6 w-6 mr-3 group-hover:rotate-90 transition-transform" />
-                        Generate Draft
+                        {quizType === 'ai' ? 'Generate Draft' : 'Publish Quiz'}
                       </>
                     )}
                   </button>
@@ -522,6 +569,26 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
                 <form onSubmit={handleCreateMaterial} className="space-y-6">
                   <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Material Type</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMaterialType('pdf')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${materialType === 'pdf' ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-500'}`}
+                      >
+                        PDF Upload
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMaterialType('drive')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${materialType === 'drive' ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-500'}`}
+                      >
+                        Google Drive
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Material Title</label>
                     <input
                       type="text"
@@ -534,41 +601,54 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">ACE Chapter</label>
-                    <select
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">ACE Chapter(s)</label>
+                    <input
+                      type="text"
                       value={materialChapter}
                       onChange={(e) => setMaterialChapter(e.target.value)}
+                      placeholder="e.g. 1 or 1-5"
                       className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
-                    >
-                      {Array.from({ length: 16 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>Chapter {i + 1}</option>
-                      ))}
-                    </select>
+                      required
+                    />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">PDF File</label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        onChange={handleMaterialFileUpload}
-                        accept=".pdf"
-                        className="hidden"
-                        id="material-file"
-                      />
-                      <label
-                        htmlFor="material-file"
-                        className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
-                          materialFile ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200 hover:border-blue-300'
-                        }`}
-                      >
-                        <Upload className={`h-8 w-8 mb-2 ${materialFile ? 'text-green-500' : 'text-slate-400'}`} />
-                        <span className="text-xs font-bold text-slate-500">
-                          {materialFile ? 'PDF Ready' : 'Click to select PDF'}
-                        </span>
-                      </label>
+                  {materialType === 'pdf' ? (
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">PDF File</label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          onChange={handleMaterialFileUpload}
+                          accept=".pdf"
+                          className="hidden"
+                          id="material-file"
+                        />
+                        <label
+                          htmlFor="material-file"
+                          className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
+                            materialFile ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200 hover:border-blue-300'
+                          }`}
+                        >
+                          <Upload className={`h-8 w-8 mb-2 ${materialFile ? 'text-green-500' : 'text-slate-400'}`} />
+                          <span className="text-xs font-bold text-slate-500">
+                            {materialFile ? 'PDF Ready' : 'Click to select PDF'}
+                          </span>
+                        </label>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Google Drive Link</label>
+                      <input
+                        type="url"
+                        value={driveUrl}
+                        onChange={(e) => setDriveUrl(e.target.value)}
+                        placeholder="https://drive.google.com/drive/..."
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                        required
+                      />
+                    </div>
+                  )}
 
                   {status && activeTab === 'materials' && (
                     <div className={`p-4 rounded-2xl flex items-center space-x-3 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
@@ -581,10 +661,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
                   <button
                     type="submit"
-                    disabled={!materialFile}
-                    className="w-full bg-purple-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-purple-700 transition-all shadow-xl shadow-purple-500/20 disabled:opacity-50"
+                    className="w-full bg-purple-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-purple-700 transition-all shadow-xl shadow-purple-500/20"
                   >
-                    Upload Material
+                    {materialType === 'pdf' ? 'Upload PDF' : 'Add Drive Link'}
                   </button>
                 </form>
               </div>
@@ -685,9 +764,15 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                               </span>
                             </div>
                             <div className="flex items-center space-x-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                              <span className="flex items-center"><Clock className="h-3 w-3 mr-1" /> {quiz.questions.length} Qs</span>
-                              <span className="flex items-center"><Sparkles className="h-3 w-3 mr-1" /> {quiz.difficulty}</span>
-                              <span className="flex items-center"><Trophy className="h-3 w-3 mr-1" /> {quiz.pointsPerQuestion} Pts/Q</span>
+                              {quiz.type === 'ai' ? (
+                                <>
+                                  <span className="flex items-center"><Clock className="h-3 w-3 mr-1" /> {quiz.questions?.length || 0} Qs</span>
+                                  <span className="flex items-center"><Sparkles className="h-3 w-3 mr-1" /> {quiz.difficulty}</span>
+                                  <span className="flex items-center"><Trophy className="h-3 w-3 mr-1" /> {quiz.pointsPerQuestion} Pts/Q</span>
+                                </>
+                              ) : (
+                                <span className="flex items-center text-blue-600"><Globe className="h-3 w-3 mr-1" /> Google Form</span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -776,7 +861,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           <div>
                             <h3 className="text-xl font-bold text-slate-900 mb-1">{material.title}</h3>
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                              Chapter {material.chapter} • Added {new Date(material.createdAt?.toDate()).toLocaleDateString()}
+                              Chapter {material.chapter} • {material.type === 'pdf' ? 'PDF' : 'Drive Link'} • Added {new Date(material.createdAt?.toDate()).toLocaleDateString()}
                             </div>
                           </div>
                         </div>

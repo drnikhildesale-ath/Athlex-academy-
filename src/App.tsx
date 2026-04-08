@@ -20,63 +20,68 @@ export default function App() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    console.log("App useEffect running...");
-    // Safety timeout: force loading to false after 5 seconds
-    const safetyTimeout = setTimeout(() => {
-      if (loading) {
-        console.warn("Auth state taking too long, forcing load...");
-        setLoading(false);
-      }
-    }, 5000);
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      clearTimeout(safetyTimeout);
-      try {
-        if (firebaseUser) {
-          // Check if user exists in Firestore, if not create profile
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const userSnap = await getDoc(userRef);
-
-          if (!userSnap.exists()) {
-            const newUser = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL,
-              role: firebaseUser.email === 'drnikhildesale@gmail.com' ? 'admin' : 'student',
-              createdAt: serverTimestamp()
-            };
-            await setDoc(userRef, newUser);
-            setUser(newUser);
-            setIsAdmin(newUser.role === 'admin');
-          } else {
-            const userData = userSnap.data();
-            const isAdminEmail = firebaseUser.email === 'drnikhildesale@gmail.com';
-            
-            // Auto-fix: If user has admin email but is marked as student, update Firestore
-            if (isAdminEmail && userData.role !== 'admin') {
-              await setDoc(userRef, { role: 'admin' }, { merge: true });
-              userData.role = 'admin';
-            }
-            
-            setUser(userData);
-            setIsAdmin(userData.role === 'admin' || isAdminEmail);
-          }
-        } else {
-          setUser(null);
-          setIsAdmin(false);
+    try {
+      console.log("App useEffect running...");
+      // Safety timeout: force loading to false after 5 seconds
+      const safetyTimeout = setTimeout(() => {
+        if (loading) {
+          console.warn("Auth state taking too long, forcing load...");
+          setLoading(false);
         }
-      } catch (error) {
-        console.error("Auth State Error:", error);
-        // Fallback: allow app to load even if Firestore check fails
-        setUser(firebaseUser ? { uid: firebaseUser.uid, email: firebaseUser.email } : null);
-        setIsAdmin(firebaseUser?.email === 'drnikhildesale@gmail.com');
-      } finally {
-        setLoading(false);
-      }
-    });
+      }, 5000);
 
-    return () => unsubscribe();
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        clearTimeout(safetyTimeout);
+        try {
+          if (firebaseUser) {
+            // Check if user exists in Firestore, if not create profile
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            const userSnap = await getDoc(userRef);
+
+            if (!userSnap.exists()) {
+              const newUser = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+                photoURL: firebaseUser.photoURL,
+                role: firebaseUser.email === 'drnikhildesale@gmail.com' ? 'admin' : 'student',
+                createdAt: serverTimestamp()
+              };
+              await setDoc(userRef, newUser);
+              setUser(newUser);
+              setIsAdmin(newUser.role === 'admin');
+            } else {
+              const userData = userSnap.data();
+              const isAdminEmail = firebaseUser.email === 'drnikhildesale@gmail.com';
+              
+              // Auto-fix: If user has admin email but is marked as student, update Firestore
+              if (isAdminEmail && (userData as any).role !== 'admin') {
+                await setDoc(userRef, { role: 'admin' }, { merge: true });
+                (userData as any).role = 'admin';
+              }
+              
+              setUser(userData);
+              setIsAdmin((userData as any).role === 'admin' || isAdminEmail);
+            }
+          } else {
+            setUser(null);
+            setIsAdmin(false);
+          }
+        } catch (error) {
+          console.error("Auth State Error:", error);
+          // Fallback: allow app to load even if Firestore check fails
+          setUser(firebaseUser ? { uid: firebaseUser.uid, email: firebaseUser.email } : null);
+          setIsAdmin(firebaseUser?.email === 'drnikhildesale@gmail.com');
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      return () => unsubscribe();
+    } catch (e) {
+      console.error("App useEffect crashed:", e);
+      setLoading(false);
+    }
   }, []);
 
   if (loading) {
@@ -90,32 +95,42 @@ export default function App() {
     );
   }
 
-  return (
-    <ErrorBoundary>
-      <Router>
-        <Layout user={user} isAdmin={isAdmin}>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route 
-              path="/auth" 
-              element={user ? <Navigate to="/dashboard" /> : <AuthPage />} 
-            />
-            <Route 
-              path="/dashboard" 
-              element={user ? <StudentDashboard user={user} /> : <Navigate to="/auth" />} 
-            />
-            <Route 
-              path="/admin" 
-              element={isAdmin ? <AdminDashboard user={user} /> : <Navigate to="/dashboard" />} 
-            />
-            <Route 
-              path="/quiz/:id" 
-              element={user ? <QuizPage user={user} /> : <Navigate to="/auth" />} 
-            />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </Layout>
-      </Router>
-    </ErrorBoundary>
-  );
+  try {
+    return (
+      <ErrorBoundary>
+        <Router>
+          <Layout user={user} isAdmin={isAdmin}>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route 
+                path="/auth" 
+                element={user ? <Navigate to="/dashboard" /> : <AuthPage />} 
+              />
+              <Route 
+                path="/dashboard" 
+                element={user ? <StudentDashboard user={user} /> : <Navigate to="/auth" />} 
+              />
+              <Route 
+                path="/admin" 
+                element={isAdmin ? <AdminDashboard user={user} /> : <Navigate to="/dashboard" />} 
+              />
+              <Route 
+                path="/quiz/:id" 
+                element={user ? <QuizPage user={user} /> : <Navigate to="/auth" />} 
+              />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </Layout>
+        </Router>
+      </ErrorBoundary>
+    );
+  } catch (err) {
+    console.error("App Render Error:", err);
+    return (
+      <div className="p-10 text-red-600">
+        <h1>Critical Render Error</h1>
+        <pre>{err instanceof Error ? err.message : String(err)}</pre>
+      </div>
+    );
+  }
 }

@@ -82,12 +82,17 @@ service cloud.firestore {
     }
 
     function isValidQuiz(data) {
-      return hasRequiredFields(['title', 'questions', 'createdAt', 'createdBy', 'status', 'difficulty', 'pointsPerQuestion']) &&
+      return hasRequiredFields(['title', 'createdAt', 'createdBy', 'status', 'type']) &&
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.questions is list && data.questions.size() > 0 && data.questions.size() <= 100 &&
              data.status in ['draft', 'published'] &&
-             data.difficulty in ['Easy', 'Medium', 'Hard'] &&
-             data.pointsPerQuestion is number &&
+             data.type in ['ai', 'google_form'] &&
+             (data.type == 'ai' ? (
+               data.questions is list && data.questions.size() > 0 &&
+               data.difficulty in ['Easy', 'Medium', 'Hard'] &&
+               data.pointsPerQuestion is number
+             ) : (
+               data.googleFormUrl is string && isValidUrl(data.googleFormUrl)
+             )) &&
              data.createdAt is timestamp &&
              data.createdBy == request.auth.uid;
     }
@@ -103,9 +108,10 @@ service cloud.firestore {
     }
 
     function isValidMaterial(data) {
-      return hasRequiredFields(['title', 'fileUrl', 'createdAt', 'createdBy']) &&
+      return hasRequiredFields(['title', 'createdAt', 'createdBy', 'type']) &&
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.fileUrl is string && data.fileUrl.size() > 0 &&
+             data.type in ['pdf', 'drive'] &&
+             (data.type == 'pdf' ? data.fileUrl is string : (data.driveUrl is string && isValidUrl(data.driveUrl))) &&
              data.createdAt is timestamp &&
              data.createdBy == request.auth.uid;
     }

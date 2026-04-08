@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, getDocs, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap } from 'lucide-react';
+import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink } from 'lucide-react';
 
 interface StudentDashboardProps {
   user: any;
@@ -121,33 +121,53 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {quizzes.length > 0 ? quizzes.map((quiz) => (
-              <Link
-                key={quiz.id}
-                to={`/quiz/${quiz.id}`}
-                className="group bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 hover:-translate-y-1 transition-all relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-[3rem] -z-0 opacity-50 group-hover:scale-110 transition-transform"></div>
-                
-                <div className="relative z-10">
-                  <div className="bg-blue-50 w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <Dumbbell className="h-7 w-7 text-blue-600 group-hover:text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">{quiz.title}</h3>
-                  <p className="text-slate-500 text-sm mb-6 line-clamp-2 leading-relaxed">{quiz.description || "Master the concepts from this chapter with our custom signature quizzes."}</p>
+            {quizzes.length > 0 ? quizzes.map((quiz) => {
+              const isGoogleForm = quiz.type === 'google_form';
+              const CardContent = (
+                <div className="group bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 hover:-translate-y-1 transition-all relative overflow-hidden h-full">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-[3rem] -z-0 opacity-50 group-hover:scale-110 transition-transform"></div>
                   
-                  <div className="flex items-center justify-between pt-6 border-t border-slate-50">
-                    <div className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-widest">
-                      <Clock className="h-4 w-4 mr-2" />
-                      {quiz.questions.length} Questions
+                  <div className="relative z-10">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isGoogleForm ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
+                      {isGoogleForm ? <Globe className="h-7 w-7" /> : <Dumbbell className="h-7 w-7" />}
                     </div>
-                    <div className="text-blue-600 font-black flex items-center text-sm uppercase tracking-widest">
-                      Start <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{quiz.title}</h3>
+                      {isGoogleForm && <ExternalLink className="h-4 w-4 text-slate-300" />}
+                    </div>
+                    <p className="text-slate-500 text-sm mb-6 line-clamp-2 leading-relaxed">
+                      {isGoogleForm ? "External Google Form Quiz. Click to open and complete." : (quiz.description || "Master the concepts from this chapter with our custom signature quizzes.")}
+                    </p>
+                    
+                    <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                      <div className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                        {isGoogleForm ? (
+                          <span className="flex items-center"><Globe className="h-4 w-4 mr-2" /> External Form</span>
+                        ) : (
+                          <>
+                            <Clock className="h-4 w-4 mr-2" />
+                            {quiz.questions?.length || 0} Questions
+                          </>
+                        )}
+                      </div>
+                      <div className="text-blue-600 font-black flex items-center text-sm uppercase tracking-widest">
+                        {isGoogleForm ? 'Open' : 'Start'} <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </Link>
-            )) : (
+              );
+
+              return isGoogleForm ? (
+                <a key={quiz.id} href={quiz.googleFormUrl} target="_blank" rel="noopener noreferrer" className="block">
+                  {CardContent}
+                </a>
+              ) : (
+                <Link key={quiz.id} to={`/quiz/${quiz.id}`} className="block">
+                  {CardContent}
+                </Link>
+              );
+            }) : (
               <div className="col-span-full p-12 bg-white rounded-[3rem] border border-dashed border-slate-200 text-center">
                 <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
                   <BookOpen className="h-8 w-8 text-slate-300" />
@@ -208,20 +228,26 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 <div 
                   key={item.id} 
                   onClick={() => {
-                    const win = window.open();
-                    if (win) {
-                      win.document.write(`<iframe src="${item.fileUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                    if (item.type === 'drive') {
+                      window.open(item.driveUrl, '_blank');
+                    } else {
+                      const win = window.open();
+                      if (win) {
+                        win.document.write(`<iframe src="${item.fileUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                      }
                     }
                   }}
                   className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer group"
                 >
                   <div className="flex items-center space-x-4">
-                    <div className="bg-white/10 p-2.5 rounded-xl text-blue-400 group-hover:text-white transition-colors">
-                      <FileText className="h-5 w-5" />
+                    <div className={`p-2.5 rounded-xl transition-colors ${item.type === 'drive' ? 'bg-blue-500/20 text-blue-400 group-hover:text-white' : 'bg-white/10 text-blue-400 group-hover:text-white'}`}>
+                      {item.type === 'drive' ? <Globe className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                     </div>
                     <div>
                       <div className="text-sm font-bold">{item.title}</div>
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Chapter {item.chapter} • PDF</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                        Chapter {item.chapter} • {item.type === 'drive' ? 'Drive Link' : 'PDF'}
+                      </div>
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-white transition-all" />

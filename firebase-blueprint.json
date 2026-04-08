@@ -16,15 +16,17 @@
     },
     "Quiz": {
       "title": "ACE-CPT Quiz",
-      "description": "A quiz containing multiple MCQs for a specific chapter or topic.",
+      "description": "A quiz containing multiple MCQs for a specific chapter or topic, or a Google Form link.",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
         "description": { "type": "string" },
-        "chapter": { "type": "integer" },
+        "chapter": { "type": "string", "description": "Chapter number or range (e.g., '1', '1-5')" },
         "difficulty": { "type": "string", "enum": ["Easy", "Medium", "Hard"] },
         "pointsPerQuestion": { "type": "integer" },
         "status": { "type": "string", "enum": ["draft", "published"] },
+        "type": { "type": "string", "enum": ["ai", "google_form"], "description": "Type of quiz: AI-generated or Google Form." },
+        "googleFormUrl": { "type": "string", "format": "uri" },
         "assignedTo": { "type": "array", "items": { "type": "string" }, "description": "List of student UIDs assigned to this quiz." },
         "questions": {
           "type": "array",
@@ -41,7 +43,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }
       },
-      "required": ["title", "questions", "createdAt", "status", "difficulty", "pointsPerQuestion"]
+      "required": ["title", "createdAt", "status", "type", "createdBy"]
     },
     "Score": {
       "title": "Student Score",
@@ -64,13 +66,15 @@
       "properties": {
         "title": { "type": "string" },
         "description": { "type": "string" },
-        "chapter": { "type": "integer" },
-        "fileUrl": { "type": "string", "format": "uri", "description": "URL to the PDF file or base64 data." },
+        "chapter": { "type": "string" },
+        "type": { "type": "string", "enum": ["pdf", "drive"], "description": "Type of material: PDF upload or Google Drive link." },
+        "fileUrl": { "type": "string", "description": "URL to the PDF file or base64 data." },
+        "driveUrl": { "type": "string", "format": "uri", "description": "Link to Google Drive folder or file." },
         "assignedTo": { "type": "array", "items": { "type": "string" }, "description": "List of student UIDs assigned to this material." },
         "createdAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }
       },
-      "required": ["title", "fileUrl", "createdAt", "createdBy"]
+      "required": ["title", "type", "createdAt", "createdBy"]
     },
     "LiveClass": {
       "title": "Live Class",
