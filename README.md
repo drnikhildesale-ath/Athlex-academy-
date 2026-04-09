@@ -1,20 +1,21 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Athlex Academy
 
-# Run and deploy your AI Studio app
+Educational portal for ACE-CPT certification students with AI-generated quizzes and live class integration.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/29b6a41a-49e5-485e-a22e-0582eabaa930
+- **Student Dashboard**: Track progress, access live classes, and view success stories.
+- **AI Quizzes**: Practice with dynamically generated quizzes based on course material.
+- **Admin Panel**: Manage students, track performance, and update course content.
+- **Success Stories**: Real-world results from certified coaches.
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+- **Frontend**: React, TypeScript, Tailwind CSS, Motion
+- **Backend**: Firebase (Auth & Firestore)
+- **AI**: Gemini API for quiz generation
 
+## Deployment
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+This project is ready to be deployed on Vercel or Netlify.
+Make sure to set the `GEMINI_API_KEY` environment variable in your deployment settings.

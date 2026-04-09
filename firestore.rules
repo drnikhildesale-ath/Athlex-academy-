@@ -136,6 +136,15 @@ service cloud.firestore {
              data.createdAt is timestamp;
     }
 
+    function isValidSuccessStory(data) {
+      return hasRequiredFields(['title', 'student', 'thumbnail', 'videoUrl', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 &&
+             data.student is string && data.student.size() > 0 &&
+             isValidUrl(data.thumbnail) &&
+             isValidUrl(data.videoUrl) &&
+             data.createdAt is timestamp;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -212,6 +221,16 @@ service cloud.firestore {
       
       // Only admins can update or delete.
       allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /successStories/{storyId} {
+      // Anyone can read success stories (publicly visible on landing page).
+      allow read: if true;
+      
+      // Only admins can manage success stories.
+      allow create: if isAdmin() && isValidSuccessStory(request.resource.data);
+      allow update: if isAdmin() && isValidSuccessStory(request.resource.data);
       allow delete: if isAdmin();
     }
   }

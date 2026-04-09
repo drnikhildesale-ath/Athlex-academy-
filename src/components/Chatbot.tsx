@@ -1,0 +1,144 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { MessageCircle, X, Send, Loader2, Bot, User } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { getChatResponse, ChatMessage } from '../services/gemini';
+
+export const Chatbot: React.FC = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<{ role: 'user' | 'model', content: string }[]>([
+    { role: 'model', content: "Hi! I'm your ACE-CPT study assistant. How can I help you today?" }
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      const history: ChatMessage[] = messages.map(m => ({
+        role: m.role,
+        parts: [{ text: m.content }]
+      }));
+
+      const response = await getChatResponse(userMessage, history);
+      setMessages(prev => [...prev, { role: 'model', content: response }]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'model', content: "Sorry, I encountered an error. Please try again." }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="mb-4 w-80 sm:w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-100"
+          >
+            {/* Header */}
+            <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Bot size={20} />
+                <span className="font-semibold">ACE-CPT Assistant</span>
+              </div>
+              <button 
+                onClick={() => setIsOpen(false)}
+                className="hover:bg-blue-700 p-1 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+              {messages.map((msg, i) => (
+                <div 
+                  key={i} 
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div className={`mt-1 p-1 rounded-full ${msg.role === 'user' ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-600'}`}>
+                      {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
+                    </div>
+                    <div className={`p-3 rounded-2xl text-sm ${
+                      msg.role === 'user' 
+                        ? 'bg-blue-600 text-white rounded-tr-none shadow-md shadow-blue-200' 
+                        : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-tl-none'
+                    }`}>
+                      <div className={`prose prose-sm max-w-none prose-p:leading-relaxed ${
+                        msg.role === 'user' ? 'prose-invert' : ''
+                      }`}>
+                        <ReactMarkdown>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 rounded-tl-none">
+                    <Loader2 size={16} className="animate-spin text-blue-600" />
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="p-4 bg-white border-t border-gray-100">
+              <form 
+                onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+                className="flex gap-2"
+              >
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask a question..."
+                  className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isLoading}
+                  className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  <Send size={18} />
+                </button>
+              </form>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center"
+      >
+        {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
+      </motion.button>
+    </div>
+  );
+};

@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, getDocs, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink } from 'lucide-react';
+import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award } from 'lucide-react';
 
 interface StudentDashboardProps {
   user: any;
@@ -82,29 +82,44 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
-      <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Student Dashboard</h1>
-          <p className="text-slate-500 font-medium">Welcome back, {user.displayName}! Ready to master ACE-CPT?</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4">
-            <div className="bg-blue-50 p-3 rounded-xl text-blue-600">
-              <Trophy className="h-6 w-6" />
+      {/* Welcome & Progress Header */}
+      <div className="mb-12">
+        <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-slate-100 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+          
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full text-blue-600 font-bold text-xs uppercase tracking-widest mb-6">
+                <Trophy className="h-4 w-4" />
+                <span>Your Learning Journey</span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">
+                Welcome back, <span className="text-blue-600">{user.displayName?.split(' ')[0]}!</span>
+              </h1>
+              <p className="text-lg text-slate-500 font-medium leading-relaxed">
+                You've completed <span className="text-slate-900 font-bold">{scores.length} quizzes</span> with an average score of <span className="text-blue-600 font-bold">{averageScore}%</span>. Keep pushing towards your ACE-CPT certification!
+              </p>
             </div>
-            <div>
-              <div className="text-2xl font-black text-slate-900">{averageScore}%</div>
-              <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Avg Score</div>
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4">
-            <div className="bg-red-50 p-3 rounded-xl text-red-600">
-              <Star className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="text-2xl font-black text-slate-900">{scores.length}</div>
-              <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Quizzes Taken</div>
+
+            <div className="flex flex-wrap gap-4">
+              <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex items-center space-x-4 min-w-[200px]">
+                <div className="bg-blue-600 text-white p-3 rounded-xl shadow-lg shadow-blue-500/20">
+                  <Trophy className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="text-2xl font-black text-slate-900">{averageScore}%</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Mastery Level</div>
+                </div>
+              </div>
+              <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex items-center space-x-4 min-w-[200px]">
+                <div className="bg-red-600 text-white p-3 rounded-xl shadow-lg shadow-red-500/20">
+                  <Star className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="text-2xl font-black text-slate-900">{scores.length}</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Quizzes Done</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -255,6 +270,79 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               )) : (
                 <p className="text-slate-500 text-sm italic text-center py-4">No materials assigned yet.</p>
               )}
+            </div>
+          </div>
+
+          {/* Quick Links / Community */}
+          <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900 mb-8 flex items-center tracking-tight">
+              <Globe className="h-6 w-6 mr-3 text-blue-600" />
+              Quick Resources
+            </h2>
+            <div className="grid grid-cols-1 gap-4">
+              <a 
+                href="https://chat.whatsapp.com/your-group-link" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center space-x-4 p-4 rounded-2xl bg-green-50 border border-green-100 hover:bg-green-100 transition-colors group"
+              >
+                <div className="bg-green-600 text-white p-2.5 rounded-xl">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Student Community</div>
+                  <div className="text-[10px] text-green-600 font-bold uppercase tracking-widest">Join WhatsApp Group</div>
+                </div>
+              </a>
+              <a 
+                href="#" 
+                className="flex items-center space-x-4 p-4 rounded-2xl bg-blue-50 border border-blue-100 hover:bg-blue-100 transition-colors group"
+              >
+                <div className="bg-blue-600 text-white p-2.5 rounded-xl">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-900">ACE-CPT Syllabus</div>
+                  <div className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">Download PDF</div>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          {/* Hall of Fame / Success Stories */}
+          <div className="bg-slate-900 rounded-[3rem] p-8 text-white shadow-2xl shadow-blue-900/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+            <h2 className="text-xl font-bold mb-8 flex items-center tracking-tight">
+              <Trophy className="h-6 w-6 mr-3 text-blue-500" />
+              Hall of Fame
+            </h2>
+            <div className="space-y-4">
+              {[
+                { name: "Akanksha Sabharwal", result: "Passed ACE-CPT", icon: <Star className="h-4 w-4" /> },
+                { name: "Farman", result: "Certified Coach", icon: <Trophy className="h-4 w-4" /> },
+                { name: "Snehal Naryankar", result: "Top Scorer", icon: <Award className="h-4 w-4" /> },
+                { name: "Sanil", result: "Performance Specialist", icon: <Star className="h-4 w-4" /> }
+              ].map((item, i) => (
+                <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-blue-600/20 p-2.5 rounded-xl text-blue-400">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold">{item.name}</div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.result}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <a 
+                href="https://drive.google.com/drive/folders/1-HwLpd9s6jzaSnk4zviovrTi4vZTvXh6?usp=sharing" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block text-center py-3 text-xs font-black text-blue-400 uppercase tracking-[0.2em] hover:text-blue-300 transition-colors"
+              >
+                Watch All Stories
+              </a>
             </div>
           </div>
 

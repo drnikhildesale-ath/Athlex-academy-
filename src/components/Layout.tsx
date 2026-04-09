@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { LogOut, User, Menu, X, Dumbbell } from 'lucide-react';
+import { Chatbot } from './Chatbot';
+
+const logoImg = "https://picsum.photos/seed/athlex/200/200";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,10 +31,9 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
             <div className="flex items-center">
               <Link to="/" className="flex items-center">
                 <img 
-                  src="https://photos.fife.usercontent.google.com/pw/AP1GczPiIMxbi35Ibe9nkZZO1UdiXA5hb_VJWq6I63t--QAwn7gHzuGOOvB2=w928-h928-s-no-gm?authuser=0" 
+                  src={logoImg} 
                   alt="Athlex Academy Logo" 
                   className="h-12 w-auto"
-                  referrerPolicy="no-referrer"
                 />
               </Link>
             </div>
@@ -157,16 +159,16 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
               <img 
-                src="https://photos.fife.usercontent.google.com/pw/AP1GczPiIMxbi35Ibe9nkZZO1UdiXA5hb_VJWq6I63t--QAwn7gHzuGOOvB2=w928-h928-s-no-gm?authuser=0" 
+                src={logoImg} 
                 alt="Athlex Academy Logo" 
                 className="h-10 w-auto brightness-0 invert"
-                referrerPolicy="no-referrer"
               />
             </div>
             <p className="text-sm">© 2026 Athlex Academy. All rights reserved.</p>
           </div>
         </div>
       </footer>
+      <Chatbot />
     </div>
   );
 }

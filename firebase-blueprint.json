@@ -103,6 +103,20 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["studentEmail", "studentMobile", "courseName", "createdAt"]
+    },
+    "SuccessStory": {
+      "title": "Success Story",
+      "description": "Student testimonials and success stories with video links.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "student": { "type": "string" },
+        "thumbnail": { "type": "string", "format": "uri" },
+        "videoUrl": { "type": "string", "format": "uri" },
+        "order": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "student", "thumbnail", "videoUrl", "createdAt"]
     }
   },
   "firestore": {
@@ -129,6 +143,10 @@
     "/inquiries/{inquiryId}": {
       "schema": "Inquiry",
       "description": "Student course inquiries."
+    },
+    "/successStories/{storyId}": {
+      "schema": "SuccessStory",
+      "description": "Student success stories for the landing page."
     }
   }
 }

@@ -3,7 +3,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, delete
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
-import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone } from 'lucide-react';
+import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -34,8 +34,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [liveClasses, setLiveClasses] = React.useState<any[]>([]);
   const [inquiries, setInquiries] = React.useState<any[]>([]);
   const [students, setStudents] = React.useState<any[]>([]);
+  const [successStories, setSuccessStories] = React.useState<any[]>([]);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries'>('quizzes');
+  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories'>('quizzes');
 
   // New Content Forms
   const [materialTitle, setMaterialTitle] = React.useState('');
@@ -46,6 +47,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [liveClassTitle, setLiveClassTitle] = React.useState('');
   const [liveClassLink, setLiveClassLink] = React.useState('');
   const [liveClassDate, setLiveClassDate] = React.useState('');
+  
+  // Success Story Form
+  const [storyTitle, setStoryTitle] = React.useState('');
+  const [storyStudent, setStoryStudent] = React.useState('');
+  const [storyThumbnail, setStoryThumbnail] = React.useState('');
+  const [storyVideoUrl, setStoryVideoUrl] = React.useState('');
+  const [storyOrder, setStoryOrder] = React.useState(0);
   
   // Review state
   const [draftQuiz, setDraftQuiz] = React.useState<MCQ[] | null>(null);
@@ -84,12 +92,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'inquiries'));
 
+    const unsubscribeStories = onSnapshot(query(collection(db, 'successStories'), orderBy('order', 'asc')), (snapshot) => {
+      setSuccessStories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'successStories'));
+
     return () => {
       unsubscribeQuizzes();
       unsubscribeStudents();
       unsubscribeMaterials();
       unsubscribeLiveClasses();
       unsubscribeInquiries();
+      unsubscribeStories();
     };
   }, []);
 
@@ -264,6 +277,30 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleCreateStory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!storyTitle || !storyStudent || !storyThumbnail || !storyVideoUrl) return;
+
+    try {
+      await addDoc(collection(db, 'successStories'), {
+        title: storyTitle,
+        student: storyStudent,
+        thumbnail: storyThumbnail,
+        videoUrl: storyVideoUrl,
+        order: storyOrder,
+        createdAt: serverTimestamp()
+      });
+      setStoryTitle('');
+      setStoryStudent('');
+      setStoryThumbnail('');
+      setStoryVideoUrl('');
+      setStoryOrder(0);
+      setStatus({ type: 'success', message: "Success story added successfully!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'successStories');
+    }
+  };
+
   const handleAssignMaterial = async (materialId: string, studentIds: string[]) => {
     try {
       await setDoc(doc(db, 'materials', materialId), { assignedTo: studentIds }, { merge: true });
@@ -319,6 +356,16 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleDeleteStory = async (id: string) => {
+    if (window.confirm("Delete this success story?")) {
+      try {
+        await deleteDoc(doc(db, 'successStories', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `successStories/${id}`);
+      }
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-12">
@@ -332,7 +379,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           { id: 'quizzes', label: 'Quizzes', icon: <Dumbbell className="h-4 w-4" /> },
           { id: 'materials', label: 'Study Materials', icon: <FileText className="h-4 w-4" /> },
           { id: 'liveClasses', label: 'Live Classes', icon: <Video className="h-4 w-4" /> },
-          { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-4 w-4" /> }
+          { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-4 w-4" /> },
+          { id: 'stories', label: 'Success Stories', icon: <Trophy className="h-4 w-4" /> }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -750,16 +798,171 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             )}
 
             {activeTab === 'inquiries' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Course Inquiries</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {inquiries.length} Total
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {inquiries.map((inquiry) => (
+                    <div key={inquiry.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="bg-blue-50 p-3 rounded-2xl">
+                          <Mail className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-900">{inquiry.studentEmail}</div>
+                          <div className="text-xs text-slate-500 font-medium flex items-center space-x-3">
+                            <span className="flex items-center"><Phone className="h-3 w-3 mr-1" /> {inquiry.studentMobile}</span>
+                            <span className="flex items-center"><Dumbbell className="h-3 w-3 mr-1" /> {inquiry.courseName}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteInquiry(inquiry.id)}
+                        className="p-2 text-slate-300 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                  {inquiries.length === 0 && (
+                    <div className="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                      <p className="text-slate-400 font-medium">No inquiries yet.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'stories' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Success Stories</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {successStories.length} Total
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {successStories.map((story) => (
+                    <div key={story.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden group">
+                      <div className="aspect-video relative">
+                        <img src={story.thumbnail} alt={story.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <PlayCircle className="h-12 w-12 text-white" />
+                        </div>
+                      </div>
+                      <div className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-bold text-slate-900 mb-1">{story.title}</h3>
+                            <p className="text-sm text-slate-500 font-medium">{story.student}</p>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteStory(story.id)}
+                            className="p-2 text-slate-300 hover:text-red-600 transition-colors"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {successStories.length === 0 && (
+                    <div className="col-span-full text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                      <p className="text-slate-400 font-medium">No success stories added yet.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'stories' && (
               <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
                 <div className="flex items-center space-x-3 mb-8">
-                  <div className="bg-blue-50 p-3 rounded-2xl">
-                    <Mail className="h-6 w-6 text-blue-600" />
+                  <div className="bg-yellow-50 p-3 rounded-2xl">
+                    <Trophy className="h-6 w-6 text-yellow-600" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Student Inquiries</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Add Success Story</h2>
                 </div>
-                <p className="text-slate-500 text-sm font-medium leading-relaxed">
-                  View and manage course inquiries from prospective students. Contact them via email or phone to provide more details.
-                </p>
+
+                <form onSubmit={handleCreateStory} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Story Title</label>
+                    <input
+                      type="text"
+                      value={storyTitle}
+                      onChange={(e) => setStoryTitle(e.target.value)}
+                      placeholder="e.g. Transformation Journey"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Student Name</label>
+                    <input
+                      type="text"
+                      value={storyStudent}
+                      onChange={(e) => setStoryStudent(e.target.value)}
+                      placeholder="e.g. Akanksha Sabharwal"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Thumbnail URL</label>
+                    <input
+                      type="url"
+                      value={storyThumbnail}
+                      onChange={(e) => setStoryThumbnail(e.target.value)}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Video Preview URL (Drive/YouTube)</label>
+                    <input
+                      type="url"
+                      value={storyVideoUrl}
+                      onChange={(e) => setStoryVideoUrl(e.target.value)}
+                      placeholder="https://drive.google.com/file/d/.../preview"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Display Order</label>
+                    <input
+                      type="number"
+                      value={storyOrder}
+                      onChange={(e) => setStoryOrder(parseInt(e.target.value))}
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                    />
+                  </div>
+
+                  {status && activeTab === 'stories' && (
+                    <div className={`p-4 rounded-2xl flex items-center space-x-3 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
+                      status.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                    }`}>
+                      {status.type === 'success' ? <CheckCircle2 className="h-5 w-5 flex-shrink-0" /> : <AlertCircle className="h-5 w-5 flex-shrink-0" />}
+                      <span>{status.message}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-yellow-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-yellow-700 transition-all shadow-xl shadow-yellow-500/20"
+                  >
+                    Add Success Story
+                  </button>
+                </form>
               </div>
             )}
           </div>

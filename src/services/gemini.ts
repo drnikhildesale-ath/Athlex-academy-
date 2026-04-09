@@ -85,3 +85,34 @@ export async function summarizeNotes(notes: string): Promise<string> {
 
   return response.text || "Failed to generate summary.";
 }
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  parts: { text: string }[];
+}
+
+export async function getChatResponse(message: string, history: ChatMessage[] = []): Promise<string> {
+  const currentApiKey = process.env.GEMINI_API_KEY;
+  if (!currentApiKey) {
+    throw new Error("GEMINI_API_KEY is not set.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: currentApiKey });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        ...history,
+        { role: 'user', parts: [{ text: message }] }
+      ],
+      config: {
+        systemInstruction: "You are a helpful study assistant for ACE-CPT certification. Answer questions based on fitness, anatomy, and exercise science. Be concise and encouraging.",
+      }
+    });
+    return response.text || "I'm sorry, I couldn't generate a response.";
+  } catch (error) {
+    console.error("Chat Error:", error);
+    throw error;
+  }
+}

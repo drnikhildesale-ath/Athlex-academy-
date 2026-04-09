@@ -13,6 +13,8 @@ import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import QuizPage from './pages/QuizPage';
 
+const logoImg = "https://picsum.photos/seed/athlex/200/200";
+
 export default function App() {
   console.log("App component rendering...");
   const [user, setUser] = React.useState<any>(null);
@@ -92,10 +94,9 @@ export default function App() {
             <div className="w-24 h-24 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
             <div className="absolute inset-0 flex items-center justify-center">
               <img 
-                src="https://photos.fife.usercontent.google.com/pw/AP1GczPiIMxbi35Ibe9nkZZO1UdiXA5hb_VJWq6I63t--QAwn7gHzuGOOvB2=w928-h928-s-no-gm?authuser=0" 
+                src={logoImg} 
                 alt="Logo" 
                 className="h-12 w-auto"
-                referrerPolicy="no-referrer"
               />
             </div>
           </div>
