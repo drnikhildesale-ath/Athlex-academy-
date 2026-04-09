@@ -13,7 +13,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import QuizPage from './pages/QuizPage';
 
-const logoImg = "https://picsum.photos/seed/athlex/200/200";
+const logoImg = "https://lh3.googleusercontent.com/d/12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl";
 
 export default function App() {
   console.log("App component rendering...");
@@ -97,6 +97,7 @@ export default function App() {
                 src={logoImg} 
                 alt="Logo" 
                 className="h-12 w-auto"
+                referrerPolicy="no-referrer"
               />
             </div>
           </div>

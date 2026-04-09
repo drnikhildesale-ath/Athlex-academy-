@@ -26,18 +26,22 @@ import {
   Youtube
 } from 'lucide-react';
 
-// Placeholder URLs for team members and logo
-const drNikhilImg = "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=400&auto=format&fit=crop";
-const anandImg = "https://images.unsplash.com/photo-1537368910025-700350fe46c7?q=80&w=400&auto=format&fit=crop";
-const sameerImg = "https://images.unsplash.com/photo-1559839734-2b71f1536783?q=80&w=400&auto=format&fit=crop";
-const logoImg = "https://picsum.photos/seed/athlex/200/200";
+// Helper to convert Google Drive sharing IDs to direct image links
+// Using the more reliable googleusercontent endpoint
+const getDriveImageUrl = (id: string) => `https://lh3.googleusercontent.com/d/${id}`;
+
+const drNikhilImg = getDriveImageUrl("19bUrS03sE3-YwzhNxeTHa5RhxDN1e81M");
+const anandImg = getDriveImageUrl("1zB7oj0EJTNV5OaTQOP4L24dMh4NA0tl7");
+const sameerImg = getDriveImageUrl("1Uq_xa8KT7gz040ztjocnuVzqj3o0Wvma");
+const drAkshayImg = getDriveImageUrl("1v3Zx8s-fOIrgNssFMJRlSgVXJBGtLqPQ");
+const logoImg = getDriveImageUrl("12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl");
 
 const TEAM_MEMBERS = [
   {
     name: "Dr. Akshay",
     role: "Founder",
     bio: "With a background in Sports Physiotherapy (MPT) and Strength & Conditioning, Dr. Akshay brings a scientific and application-driven approach to fitness education. The focus extends beyond exercise prescription to integrating evidence-based practice and performance principles, ensuring the development of skilled, competent, and industry-ready professionals.",
-    image: "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=400&auto=format&fit=crop"
+    image: drAkshayImg
   },
   {
     name: "Dr. Nikhil Desale",
@@ -534,7 +538,7 @@ export default function LandingPage() {
                   </div>
                   <div>
                     <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Call Us</div>
-                    <div className="text-lg font-bold text-slate-900">+91 98765 43210</div>
+                    <div className="text-lg font-bold text-slate-900">+91 75591 29479</div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-6">
@@ -590,6 +594,7 @@ export default function LandingPage() {
               src={logoImg} 
               alt="Athlex Academy Logo" 
               className="h-16 w-auto"
+              referrerPolicy="no-referrer"
             />
           </div>
           <p className="text-slate-500 font-medium mb-8">

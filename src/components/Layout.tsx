@@ -5,7 +5,7 @@ import { auth } from '../lib/firebase';
 import { LogOut, User, Menu, X, Dumbbell } from 'lucide-react';
 import { Chatbot } from './Chatbot';
 
-const logoImg = "https://picsum.photos/seed/athlex/200/200";
+const logoImg = "https://lh3.googleusercontent.com/d/12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -34,6 +34,7 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
                   src={logoImg} 
                   alt="Athlex Academy Logo" 
                   className="h-12 w-auto"
+                  referrerPolicy="no-referrer"
                 />
               </Link>
             </div>
@@ -162,6 +163,7 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
                 src={logoImg} 
                 alt="Athlex Academy Logo" 
                 className="h-10 w-auto brightness-0 invert"
+                referrerPolicy="no-referrer"
               />
             </div>
             <p className="text-sm">© 2026 Athlex Academy. All rights reserved.</p>
