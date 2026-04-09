@@ -90,6 +90,19 @@
         "createdBy": { "type": "string" }
       },
       "required": ["title", "link", "createdAt", "createdBy"]
+    },
+    "Inquiry": {
+      "title": "Course Inquiry",
+      "description": "Inquiries from students about specific courses.",
+      "type": "object",
+      "properties": {
+        "studentEmail": { "type": "string", "format": "email" },
+        "studentMobile": { "type": "string" },
+        "courseName": { "type": "string" },
+        "status": { "type": "string", "enum": ["new", "contacted", "closed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentEmail", "studentMobile", "courseName", "createdAt"]
     }
   },
   "firestore": {
@@ -112,6 +125,10 @@
     "/liveClasses/{classId}": {
       "schema": "LiveClass",
       "description": "Collection of live classes."
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": "Inquiry",
+      "description": "Student course inquiries."
     }
   }
 }

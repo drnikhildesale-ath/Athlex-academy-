@@ -68,6 +68,10 @@ service cloud.firestore {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
     // ===============================================================
     // Domain Validators
     // ===============================================================
@@ -122,6 +126,14 @@ service cloud.firestore {
              data.link is string && data.link.size() > 0 &&
              data.createdAt is timestamp &&
              data.createdBy == request.auth.uid;
+    }
+
+    function isValidInquiry(data) {
+      return hasRequiredFields(['studentEmail', 'studentMobile', 'courseName', 'createdAt']) &&
+             data.studentEmail is string && isValidEmail(data.studentEmail) &&
+             data.studentMobile is string && data.studentMobile.size() >= 10 &&
+             data.courseName is string &&
+             data.createdAt is timestamp;
     }
 
     // ===============================================================
@@ -188,6 +200,18 @@ service cloud.firestore {
       // Only admins can manage live classes.
       allow create: if isAdmin() && isValidLiveClass(request.resource.data);
       allow update: if isAdmin() && isValidLiveClass(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /inquiries/{inquiryId} {
+      // Only admins can read inquiries.
+      allow read: if isAdmin();
+      
+      // Anyone can create an inquiry (even unauthenticated guests).
+      allow create: if isValidInquiry(request.resource.data);
+      
+      // Only admins can update or delete.
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
   }

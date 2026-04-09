@@ -26,9 +26,13 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-2">
-                <Dumbbell className="h-8 w-8 text-red-600" />
-                <span className="text-xl font-bold text-slate-900 tracking-tight">ATHLEX ACADEMY</span>
+              <Link to="/" className="flex items-center">
+                <img 
+                  src="https://photos.fife.usercontent.google.com/pw/AP1GczPiIMxbi35Ibe9nkZZO1UdiXA5hb_VJWq6I63t--QAwn7gHzuGOOvB2=w928-h928-s-no-gm?authuser=0" 
+                  alt="Athlex Academy Logo" 
+                  className="h-12 w-auto"
+                  referrerPolicy="no-referrer"
+                />
               </Link>
             </div>
 
@@ -151,9 +155,13 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
       <footer className="bg-slate-900 text-slate-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Dumbbell className="h-6 w-6 text-red-600" />
-              <span className="text-lg font-bold text-white tracking-tight">ATHLEX ACADEMY</span>
+            <div className="mb-4 md:mb-0">
+              <img 
+                src="https://photos.fife.usercontent.google.com/pw/AP1GczPiIMxbi35Ibe9nkZZO1UdiXA5hb_VJWq6I63t--QAwn7gHzuGOOvB2=w928-h928-s-no-gm?authuser=0" 
+                alt="Athlex Academy Logo" 
+                className="h-10 w-auto brightness-0 invert"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <p className="text-sm">© 2026 Athlex Academy. All rights reserved.</p>
           </div>

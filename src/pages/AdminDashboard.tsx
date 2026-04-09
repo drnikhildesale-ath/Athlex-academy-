@@ -3,7 +3,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, delete
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
-import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe } from 'lucide-react';
+import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -32,9 +32,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [quizzes, setQuizzes] = React.useState<any[]>([]);
   const [materials, setMaterials] = React.useState<any[]>([]);
   const [liveClasses, setLiveClasses] = React.useState<any[]>([]);
+  const [inquiries, setInquiries] = React.useState<any[]>([]);
   const [students, setStudents] = React.useState<any[]>([]);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses'>('quizzes');
+  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries'>('quizzes');
 
   // New Content Forms
   const [materialTitle, setMaterialTitle] = React.useState('');
@@ -79,11 +80,16 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setLiveClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'liveClasses'));
 
+    const unsubscribeInquiries = onSnapshot(query(collection(db, 'inquiries'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'inquiries'));
+
     return () => {
       unsubscribeQuizzes();
       unsubscribeStudents();
       unsubscribeMaterials();
       unsubscribeLiveClasses();
+      unsubscribeInquiries();
     };
   }, []);
 
@@ -303,6 +309,16 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleDeleteInquiry = async (id: string) => {
+    if (window.confirm("Delete this inquiry?")) {
+      try {
+        await deleteDoc(doc(db, 'inquiries', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `inquiries/${id}`);
+      }
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-12">
@@ -315,7 +331,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         {[
           { id: 'quizzes', label: 'Quizzes', icon: <Dumbbell className="h-4 w-4" /> },
           { id: 'materials', label: 'Study Materials', icon: <FileText className="h-4 w-4" /> },
-          { id: 'liveClasses', label: 'Live Classes', icon: <Video className="h-4 w-4" /> }
+          { id: 'liveClasses', label: 'Live Classes', icon: <Video className="h-4 w-4" /> },
+          { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-4 w-4" /> }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -731,6 +748,20 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 </form>
               </div>
             )}
+
+            {activeTab === 'inquiries' && (
+              <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-blue-50 p-3 rounded-2xl">
+                    <Mail className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Student Inquiries</h2>
+                </div>
+                <p className="text-slate-500 text-sm font-medium leading-relaxed">
+                  View and manage course inquiries from prospective students. Contact them via email or phone to provide more details.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Content List Column */}
@@ -989,6 +1020,63 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         <Video className="h-10 w-10 text-slate-300" />
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 mb-2">No Live Classes Added</h3>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+            {activeTab === 'inquiries' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Course Inquiries</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {inquiries.length} New
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-6">
+                  {inquiries.length > 0 ? inquiries.map((inquiry) => (
+                    <div
+                      key={inquiry.id}
+                      className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-6">
+                          <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center">
+                            <Mail className="h-8 w-8 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-slate-900 mb-1">{inquiry.courseName}</h3>
+                            <div className="flex flex-col space-y-1">
+                              <div className="flex items-center text-sm font-medium text-slate-600">
+                                <Mail className="h-4 w-4 mr-2 text-slate-400" />
+                                {inquiry.studentEmail}
+                              </div>
+                              <div className="flex items-center text-sm font-medium text-slate-600">
+                                <Phone className="h-4 w-4 mr-2 text-slate-400" />
+                                {inquiry.studentMobile}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end space-y-4">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            {new Date(inquiry.createdAt?.toDate()).toLocaleString()}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteInquiry(inquiry.id)}
+                            className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="p-20 bg-white rounded-[3rem] border border-dashed border-slate-200 text-center">
+                      <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8">
+                        <Mail className="h-10 w-10 text-slate-300" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">No Inquiries Yet</h3>
                     </div>
                   )}
                 </div>

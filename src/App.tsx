@@ -87,9 +87,19 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-bold animate-pulse">ATHLEX ACADEMY</p>
+        <div className="flex flex-col items-center space-y-6">
+          <div className="relative">
+            <div className="w-24 h-24 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img 
+                src="https://photos.fife.usercontent.google.com/pw/AP1GczPiIMxbi35Ibe9nkZZO1UdiXA5hb_VJWq6I63t--QAwn7gHzuGOOvB2=w928-h928-s-no-gm?authuser=0" 
+                alt="Logo" 
+                className="h-12 w-auto"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          </div>
+          <p className="text-slate-400 font-black tracking-widest text-xs animate-pulse uppercase">Athlex Academy</p>
         </div>
       </div>
     );
