@@ -57,8 +57,8 @@ const TEAM_MEMBERS = [
   },
   {
     name: "Mr. Sameer Patil",
-    role: "Fitness and Lifestyle Coach",
-    bio: "A passionate fitness and lifestyle coach dedicated to helping individuals transform their bodies and quality of life. Certified personal trainer from Gold’s Gym Institute and diploma holder in Ayurvedic diet and nutrition. Currently pursuing ACE-CPT. Over 3 years of experience, guiding 100+ clients in sustainable fat loss and muscle gain.",
+    role: "Fitness & Lifestyle Coach",
+    bio: "Sameer Patil is a certified personal trainer from Gold’s Gym Institute and a diploma holder in Ayurvedic Diet & Nutrition. He brings over 3 years of practical experience, having guided 100+ clients in achieving sustainable fat loss, muscle gain, and improved fitness levels. His approach combines scientific training methods with holistic lifestyle and mindset coaching to deliver long-term, results-driven transformations.",
     image: sameerImg
   }
 ];

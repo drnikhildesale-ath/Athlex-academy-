@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from './lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Layout from './components/Layout';
 
@@ -38,28 +38,42 @@ export default function App() {
           if (firebaseUser) {
             // Check if user exists in Firestore, if not create profile
             const userRef = doc(db, 'users', firebaseUser.uid);
-            const userSnap = await getDoc(userRef);
+            let userSnap;
+            try {
+              userSnap = await getDoc(userRef);
+            } catch (err) {
+              handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
+            }
 
-            if (!userSnap.exists()) {
+            if (!userSnap?.exists()) {
               const newUser = {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
-                displayName: firebaseUser.displayName,
-                photoURL: firebaseUser.photoURL,
+                displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
+                photoURL: firebaseUser.photoURL || '',
                 role: firebaseUser.email === 'drnikhildesale@gmail.com' ? 'admin' : 'student',
                 createdAt: serverTimestamp()
               };
-              await setDoc(userRef, newUser);
-              setUser(newUser);
-              setIsAdmin(newUser.role === 'admin');
+              
+              try {
+                await setDoc(userRef, newUser);
+                setUser(newUser);
+                setIsAdmin(newUser.role === 'admin');
+              } catch (err) {
+                handleFirestoreError(err, OperationType.CREATE, `users/${firebaseUser.uid}`);
+              }
             } else {
               const userData = userSnap.data();
               const isAdminEmail = firebaseUser.email === 'drnikhildesale@gmail.com';
               
               // Auto-fix: If user has admin email but is marked as student, update Firestore
               if (isAdminEmail && (userData as any).role !== 'admin') {
-                await setDoc(userRef, { role: 'admin' }, { merge: true });
-                (userData as any).role = 'admin';
+                try {
+                  await setDoc(userRef, { role: 'admin' }, { merge: true });
+                  (userData as any).role = 'admin';
+                } catch (err) {
+                  handleFirestoreError(err, OperationType.UPDATE, `users/${firebaseUser.uid}`);
+                }
               }
               
               setUser(userData);
