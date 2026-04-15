@@ -6,9 +6,10 @@ import { getChatResponse, ChatMessage } from '../services/gemini';
 
 export const Chatbot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showNudge, setShowNudge] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ role: 'user' | 'model', content: string }[]>([
-    { role: 'model', content: "Hi! I'm your ACE-CPT study assistant. How can I help you today?" }
+    { role: 'model', content: "Hi! I'm your Athlex Academy assistant. How can I help you with our courses or your fitness studies today?" }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -20,6 +21,17 @@ export const Chatbot: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Show nudge after 200 seconds (as requested)
+    const timer = setTimeout(() => {
+      if (!isOpen) {
+        setShowNudge(true);
+      }
+    }, 200000);
+
+    return () => clearTimeout(timer);
+  }, [isOpen]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -58,7 +70,7 @@ export const Chatbot: React.FC = () => {
             <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Bot size={20} />
-                <span className="font-semibold">ACE-CPT Assistant</span>
+                <span className="font-semibold">Athlex Assistant</span>
               </div>
               <button 
                 onClick={() => setIsOpen(false)}
@@ -131,13 +143,35 @@ export const Chatbot: React.FC = () => {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {!isOpen && showNudge && (
+          <motion.div
+            initial={{ opacity: 0, x: 20, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 20, scale: 0.8 }}
+            className="absolute bottom-20 right-0 mb-2 mr-2 bg-white px-4 py-2 rounded-2xl shadow-xl border border-blue-100 text-sm font-bold text-blue-600 whitespace-nowrap"
+          >
+            Ask me your doubts!
+            <div className="absolute bottom-0 right-6 transform translate-y-1/2 rotate-45 w-3 h-3 bg-white border-r border-b border-blue-100"></div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setShowNudge(false);
+        }}
+        className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center relative group"
       >
         {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
+        {!isOpen && (
+          <span className="absolute right-full mr-4 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            Ask me your doubts
+          </span>
+        )}
       </motion.button>
     </div>
   );

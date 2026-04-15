@@ -281,7 +281,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             </h2>
             <div className="grid grid-cols-1 gap-4">
               <a 
-                href="https://chat.whatsapp.com/your-group-link" 
+                href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="flex items-center space-x-4 p-4 rounded-2xl bg-green-50 border border-green-100 hover:bg-green-100 transition-colors group"

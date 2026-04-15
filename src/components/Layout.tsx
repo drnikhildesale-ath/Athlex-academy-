@@ -166,7 +166,17 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
                 referrerPolicy="no-referrer"
               />
             </div>
-            <p className="text-sm">© 2026 Athlex Academy. All rights reserved.</p>
+            <div className="flex items-center space-x-6 mb-4 md:mb-0">
+              <a 
+                href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-green-500 transition-colors"
+              >
+                WhatsApp Community
+              </a>
+              <p className="text-sm">© 2026 Athlex Academy. All rights reserved.</p>
+            </div>
           </div>
         </div>
       </footer>

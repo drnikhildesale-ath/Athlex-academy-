@@ -64,14 +64,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   React.useEffect(() => {
     if (!user) return;
 
-    // Only show published quizzes assigned to this student
-    const q = query(
-      collection(db, 'quizzes'),
-      where('status', '==', 'published'),
-      where('assignedTo', 'array-contains', user.uid)
-    );
-    
-    const unsubscribeQuizzes = onSnapshot(q, (snapshot) => {
+    // Fetch all quizzes for admin to manage
+    const quizzesQuery = query(collection(db, 'quizzes'), orderBy('createdAt', 'desc'));
+    const unsubscribeQuizzes = onSnapshot(quizzesQuery, (snapshot) => {
       setQuizzes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'quizzes'));
 

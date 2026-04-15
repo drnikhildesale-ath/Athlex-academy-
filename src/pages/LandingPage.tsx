@@ -207,17 +207,6 @@ export default function LandingPage() {
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div className="absolute -bottom-10 -left-10 bg-white p-8 rounded-[2rem] shadow-xl z-20 hidden md:block border border-slate-100">
-              <div className="flex items-center space-x-4">
-                <div className="bg-green-50 p-3 rounded-xl">
-                  <ShieldCheck className="h-8 w-8 text-green-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-black text-slate-900">100%</div>
-                  <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Evidence Based</div>
-                </div>
-              </div>
-            </div>
           </motion.div>
         </div>
       </section>
@@ -284,7 +273,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="lg:w-1/2 relative">
-              <div className="rounded-[3rem] overflow-hidden shadow-2xl rotate-3">
+              <div className="rounded-[3rem] overflow-hidden shadow-2xl">
                 <img 
                   src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800&auto=format&fit=crop" 
                   alt="Coaching Session" 
@@ -292,7 +281,7 @@ export default function LandingPage() {
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <div className="absolute -top-10 -right-10 bg-red-600 text-white p-8 rounded-[2rem] shadow-2xl -rotate-6 hidden md:block">
+              <div className="absolute -top-10 -right-10 bg-red-600 text-white p-8 rounded-[2rem] shadow-2xl hidden md:block">
                 <div className="text-3xl font-black">1000+</div>
                 <div className="text-xs font-bold uppercase tracking-widest opacity-80">Students Trained</div>
               </div>
@@ -601,6 +590,10 @@ export default function LandingPage() {
             © {new Date().getFullYear()} Athlex Academy. All rights reserved.
           </p>
           <div className="flex justify-center space-x-8">
+            <a href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-green-600 transition-colors flex items-center space-x-2 group">
+              <Phone className="h-5 w-5 group-hover:scale-110 transition-transform" />
+              <span className="font-bold text-sm uppercase tracking-widest">WhatsApp</span>
+            </a>
             <a href="#" className="text-slate-400 hover:text-blue-600 transition-colors flex items-center space-x-2 group">
               <Instagram className="h-5 w-5 group-hover:scale-110 transition-transform" />
               <span className="font-bold text-sm uppercase tracking-widest">Instagram</span>
