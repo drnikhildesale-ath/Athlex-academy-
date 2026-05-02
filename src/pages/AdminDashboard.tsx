@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
-import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X } from 'lucide-react';
+import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X, Award } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -40,6 +40,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [exercises, setExercises] = React.useState<any[]>([]);
   const [knowledgeVideos, setKnowledgeVideos] = React.useState<any[]>([]);
   const [announcements, setAnnouncements] = React.useState<any[]>([]);
+  const [recordings, setRecordings] = React.useState<any[]>([]);
   const [chatMessages, setChatMessages] = React.useState<any[]>([]);
   const [courses, setCourses] = React.useState<any[]>([]);
   const [activeCourseId, setActiveCourseId] = React.useState<string>('');
@@ -47,7 +48,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [courseDescription, setCourseDescription] = React.useState('');
   const [selectedStudentForChat, setSelectedStudentForChat] = React.useState<any>(null);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses'>('quizzes');
+  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses' | 'students' | 'recordings'>('quizzes');
 
   // Manual Result Form
   const [selectedStudentId, setSelectedStudentId] = React.useState('');
@@ -70,6 +71,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [announcementTitle, setAnnouncementTitle] = React.useState('');
   const [announcementContent, setAnnouncementContent] = React.useState('');
   const [announcementType, setAnnouncementType] = React.useState<'info' | 'task' | 'urgent'>('info');
+  const [announcementCourseId, setAnnouncementCourseId] = React.useState('');
+  const [announcementBatch, setAnnouncementBatch] = React.useState('');
 
   const [newMessage, setNewMessage] = React.useState('');
 
@@ -98,6 +101,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [storyThumbnail, setStoryThumbnail] = React.useState('');
   const [storyVideoUrl, setStoryVideoUrl] = React.useState('');
   const [storyOrder, setStoryOrder] = React.useState(0);
+  
+  // Recording Form
+  const [recordingTitle, setRecordingTitle] = React.useState('');
+  const [recordingDescription, setRecordingDescription] = React.useState('');
+  const [recordingChapter, setRecordingChapter] = React.useState('1');
+  const [recordingVideoUrl, setRecordingVideoUrl] = React.useState('');
   
   // Review state
   const [draftQuiz, setDraftQuiz] = React.useState<MCQ[] | null>(null);
@@ -147,6 +156,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setKnowledgeVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'knowledgeVideos'));
 
+    const unsubscribeRecordings = onSnapshot(query(collection(db, 'classRecordings'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setRecordings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'classRecordings'));
+
     const unsubscribeAnnouncements = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), (snapshot) => {
       setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
@@ -168,6 +181,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       unsubscribeStudents();
       unsubscribeMaterials();
       unsubscribeLiveClasses();
+      unsubscribeRecordings();
       unsubscribeInquiries();
       unsubscribeStories();
       unsubscribeFlashcards();
@@ -400,6 +414,15 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleAssignRecording = async (recordingId: string, studentIds: string[]) => {
+    try {
+      await setDoc(doc(db, 'classRecordings', recordingId), { assignedTo: studentIds }, { merge: true });
+      setStatus({ type: 'success', message: "Recording access updated!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `classRecordings/${recordingId}`);
+    }
+  };
+
   const handleMaterialFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -553,12 +576,16 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         title: announcementTitle,
         content: announcementContent,
         type: announcementType,
+        courseId: announcementCourseId || null,
+        batch: announcementBatch || null,
         createdAt: serverTimestamp(),
         createdBy: user.uid
       });
       setAnnouncementTitle('');
       setAnnouncementContent('');
-      setStatus({ type: 'success', message: "Announcement published to students!" });
+      setAnnouncementCourseId('');
+      setAnnouncementBatch('');
+      setStatus({ type: 'success', message: "Announcement published successfully!" });
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'announcements');
     }
@@ -587,6 +614,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         studentEmail: student?.email || 'Unknown',
         quizTitle: resultTitle || `Chapter ${resultChapter} Performance`,
         chapter: resultChapter,
+        courseId: activeCourseId,
         score: resultScore,
         totalQuestions: resultTotal,
         completedAt: serverTimestamp(),
@@ -658,6 +686,43 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleUpdateStudentBatch = async (studentId: string, batch: string) => {
+    try {
+      await updateDoc(doc(db, 'users', studentId), {
+        batch
+      });
+      setStatus({ type: 'success', message: "Student batch updated!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${studentId}`);
+    }
+  };
+  
+  const handleCreateRecording = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recordingTitle || !recordingVideoUrl || !activeCourseId) {
+      setStatus({ type: 'error', message: "Title, Video URL, and Active Course are required." });
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'classRecordings'), {
+        title: recordingTitle,
+        description: recordingDescription,
+        chapter: recordingChapter,
+        courseId: activeCourseId,
+        videoUrl: recordingVideoUrl,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid
+      });
+      setRecordingTitle('');
+      setRecordingDescription('');
+      setRecordingVideoUrl('');
+      setStatus({ type: 'success', message: "Recording added to the course library!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'classRecordings');
+    }
+  };
+
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!courseTitle) return;
@@ -687,73 +752,108 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6"
-      >
-        <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Admin Command Center</h1>
-          <p className="text-slate-500 font-medium">Manage multiple courses and multi-dimensional content.</p>
-        </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans">
+      {/* Sidebar Navigation */}
+      <aside className="w-full lg:w-80 bg-slate-900 lg:sticky lg:top-0 h-auto lg:h-screen overflow-y-auto p-8 flex flex-col shadow-2xl relative">
+        {/* Background Accent */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         
-        {/* Course Dropdown */}
-        <div className="bg-white p-4 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 flex items-center space-x-4">
-          <div className="text-right hidden sm:block">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Course Context</div>
-            <div className="text-sm font-bold text-slate-900 truncate max-w-[200px]">
-              {courses.find(c => c.id === activeCourseId)?.title || "Select a course..."}
-            </div>
+        <div className="flex items-center space-x-3 mb-12 relative z-10">
+          <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10">
+            <Trophy className="h-6 w-6 text-blue-400" />
           </div>
-          <select 
-            value={activeCourseId}
-            onChange={(e) => setActiveCourseId(e.target.value)}
-            className="bg-slate-50 border border-slate-100 rounded-2xl px-6 py-3 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          >
-            <option value="">Switch Course...</option>
-            {courses.map(course => (
-              <option key={course.id} value={course.id}>{course.title}</option>
-            ))}
-          </select>
+          <div>
+            <h1 className="text-xl font-black font-serif text-white leading-tight italic">Athlex Admin</h1>
+            <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest">Premium Portal</p>
+          </div>
         </div>
-      </motion.div>
 
-      {/* Tab Navigation */}
-      <div className="flex space-x-4 mb-12 bg-slate-100 p-2 rounded-2xl w-fit">
-        {[
-          { id: 'quizzes', label: 'Quizzes', icon: <Dumbbell className="h-4 w-4" /> },
-          { id: 'materials', label: 'Study Materials', icon: <FileText className="h-4 w-4" /> },
-          { id: 'liveClasses', label: 'Live Classes', icon: <Video className="h-4 w-4" /> },
-          { id: 'exercises', label: 'Exercise Library', icon: <Activity className="h-4 w-4" /> },
-          { id: 'knowledge', label: 'Knowledge Hub', icon: <Lightbulb className="h-4 w-4" /> },
-          { id: 'flashcards', label: 'Flashcards', icon: <BookCheck className="h-4 w-4" /> },
-          { id: 'announcements', label: 'Announcements', icon: <Megaphone className="h-4 w-4" /> },
-          { id: 'courses', label: 'Manage Courses', icon: <Globe className="h-4 w-4" /> },
-          { id: 'results', label: 'Result Sheet', icon: <BookCheck className="h-4 w-4" /> },
-          { id: 'chats', label: 'Student Chats', icon: <MessageSquare className="h-4 w-4" /> },
-          { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-4 w-4" /> },
-          { id: 'stories', label: 'Success Stories', icon: <Trophy className="h-4 w-4" /> }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id as any);
-              setStatus(null);
-            }}
-            className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${
-              activeTab === tab.id 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+        <nav className="space-y-1 relative z-10">
+          {[
+            { id: 'courses', label: 'Curriculum', icon: <BookCheck className="h-5 w-5" /> },
+            { id: 'quizzes', label: 'Assessments', icon: <Sparkles className="h-5 w-5" /> },
+            { id: 'materials', label: 'Library', icon: <FileText className="h-5 w-5" /> },
+            { id: 'liveClasses', label: 'Live Events', icon: <Video className="h-5 w-5" /> },
+            { id: 'recordings', label: 'Recordings', icon: <PlayCircle className="h-5 w-5" /> },
+            { id: 'students', label: 'Students', icon: <Users className="h-5 w-5" /> },
+            { id: 'chats', label: 'Support', icon: <MessageSquare className="h-5 w-5" /> },
+            { id: 'results', label: 'Results', icon: <Activity className="h-5 w-5" /> },
+            { id: 'exercises', label: 'Exercises', icon: <Dumbbell className="h-5 w-5" /> },
+            { id: 'knowledge', label: 'Insights', icon: <Lightbulb className="h-5 w-5" /> },
+            { id: 'announcements', label: 'Notices', icon: <Megaphone className="h-5 w-5" /> },
+            { id: 'stories', label: 'Hall of Fame', icon: <Award className="h-5 w-5" /> },
+            { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-5 w-5" /> }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id as any);
+                setStatus(null);
+              }}
+              className={`w-full flex items-center space-x-4 px-6 py-4 rounded-2xl font-bold text-sm transition-all group ${
+                activeTab === tab.id 
+                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/20 translate-x-2' 
+                  : 'text-slate-400 hover:bg-white/5 active:scale-95'
+              }`}
+            >
+              <span className={`transition-transform duration-300 ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`}>
+                {tab.icon}
+              </span>
+              <span className="font-serif italic text-sm">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
 
-      {showReview && draftQuiz ? (
+        <div className="mt-auto pt-12 relative z-10">
+          <div className="bg-white/5 rounded-[2rem] p-6 border border-white/5">
+            <div className="text-xs font-black text-blue-400 uppercase tracking-widest mb-2">Active Context</div>
+            <div className="text-sm font-bold text-white truncate mb-4">
+              {courses.find(c => c.id === activeCourseId)?.title || "General Portal"}
+            </div>
+            <select 
+              value={activeCourseId}
+              onChange={(e) => setActiveCourseId(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="">Global View</option>
+              {courses.map(course => (
+                <option key={course.id} value={course.id}>{course.title}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-6 md:p-12 lg:p-16 overflow-y-auto">
+        <header className="mb-16">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h1 className="text-4xl lg:text-5xl font-black font-serif text-slate-900 tracking-tight italic mb-3">
+                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/([A-Z])/g, ' $1')}
+              </h1>
+              <p className="text-slate-500 font-medium italic">Academy command suite and content management.</p>
+            </div>
+            <AnimatePresence>
+              {status && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className={`flex items-center space-x-3 px-6 py-4 rounded-3xl font-bold text-sm ${
+                    status.type === 'success' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'
+                  }`}
+                >
+                  {status.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                  <span>{status.message}</span>
+                  <button onClick={() => setStatus(null)} className="ml-2 hover:scale-125 transition-transform"><X className="h-4 w-4" /></button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </header>
+
+        {showReview && draftQuiz ? (
         <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl mb-12 animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Review Generated Quiz: {quizTitle}</h2>
@@ -1370,6 +1470,85 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </div>
             )}
 
+            {activeTab === 'recordings' && (
+              <div className="animate-in fade-in slide-in-from-left-4">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-indigo-600 p-3 rounded-2xl">
+                    <Video className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Upload Session Recording</h2>
+                    <p className="text-sm text-slate-500">Add past class recordings to the course library</p>
+                  </div>
+                </div>
+                <form onSubmit={handleCreateRecording} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Recording Title</label>
+                    <input
+                      type="text"
+                      value={recordingTitle}
+                      onChange={(e) => setRecordingTitle(e.target.value)}
+                      placeholder="e.g. Chapter 4 Live Session - Part 1"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Chapter</label>
+                      <input
+                        type="text"
+                        value={recordingChapter}
+                        onChange={(e) => setRecordingChapter(e.target.value)}
+                        placeholder="e.g. 4"
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Course Link</label>
+                      <select 
+                        value={activeCourseId}
+                        onChange={(e) => setActiveCourseId(e.target.value)}
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-100 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-bold text-sm"
+                        required
+                      >
+                        <option value="">Select Course...</option>
+                        {courses.map(c => (
+                          <option key={c.id} value={c.id}>{c.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Video URL (Youtube/Vimeo/Drive)</label>
+                    <input
+                      type="url"
+                      value={recordingVideoUrl}
+                      onChange={(e) => setRecordingVideoUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Description (Optional)</label>
+                    <textarea
+                      value={recordingDescription}
+                      onChange={(e) => setRecordingDescription(e.target.value)}
+                      placeholder="Brief summary of what was covered..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all font-medium h-32 resize-none"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-500/20"
+                  >
+                    Save to Library
+                  </button>
+                </form>
+              </div>
+            )}
+
             {activeTab === 'announcements' && (
               <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
                 <div className="flex items-center space-x-3 mb-8">
@@ -1416,11 +1595,37 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                       required
                     />
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Target Course (Optional)</label>
+                      <select
+                        value={announcementCourseId}
+                        onChange={(e) => setAnnouncementCourseId(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-sm font-medium"
+                      >
+                        <option value="">All Courses</option>
+                        {courses.map(c => (
+                          <option key={c.id} value={c.id}>{c.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Target Batch (Optional)</label>
+                      <input
+                        type="text"
+                        value={announcementBatch}
+                        onChange={(e) => setAnnouncementBatch(e.target.value)}
+                        placeholder="e.g. Morning-Jan"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-sm font-medium"
+                      />
+                    </div>
+                  </div>
+
                   <button
                     type="submit"
                     className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-all shadow-xl shadow-red-500/20"
                   >
-                    Send to All Dashboards
+                    Publish to Targeting
                   </button>
                 </form>
               </div>
@@ -1490,11 +1695,11 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     Post Result
                   </button>
 
-                  {selectedStudentId && (
+                  {selectedStudentId && activeCourseId && (
                     <div className="pt-6 border-t border-slate-50 mt-6 animate-in fade-in slide-in-from-bottom-2">
                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Live Progress Preview</label>
                        {(() => {
-                         const studentScores = allScores.filter(s => s.studentId === selectedStudentId);
+                         const studentScores = allScores.filter(s => s.studentId === selectedStudentId && s.courseId === activeCourseId);
                          const progress = Math.min(Math.round((Array.from(new Set(studentScores.map(s => s.chapter))).filter(Boolean).length / 20) * 100), 100);
                          return (
                            <div className="space-y-3">
@@ -1917,11 +2122,11 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Course Quizzes</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {quizzes.filter(q => q.courseId === activeCourseId).length} Total
+                    {quizzes.filter(q => !activeCourseId || q.courseId === activeCourseId).length} Total
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-8">
-                  {quizzes.filter(q => q.courseId === activeCourseId).length > 0 ? quizzes.filter(q => q.courseId === activeCourseId).map((quiz) => (
+                  {quizzes.filter(q => !activeCourseId || q.courseId === activeCourseId).length > 0 ? quizzes.filter(q => !activeCourseId || q.courseId === activeCourseId).map((quiz) => (
                     <div
                       key={quiz.id}
                       className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
@@ -2117,12 +2322,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Announcements</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {announcements.length} Total
+                    {announcements.filter(a => !activeCourseId || a.courseId === activeCourseId).length} Total
                   </span>
                 </div>
                 <div className="space-y-4">
-                  {announcements.map((item) => (
-                    <div key={item.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                  {announcements.filter(a => !activeCourseId || a.courseId === activeCourseId).map((item) => (
+                    <div key={item.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:border-red-100">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center space-x-4">
                           <div className={`p-3 rounded-2xl ${
@@ -2132,7 +2337,14 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                             <Megaphone className="h-5 w-5" />
                           </div>
                           <div>
-                            <h3 className="font-bold text-slate-900">{item.title}</h3>
+                            <div className="flex items-center space-x-2">
+                              <h3 className="font-bold text-slate-900">{item.title}</h3>
+                              {item.batch && (
+                                <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-black uppercase tracking-widest">
+                                  Batch: {item.batch}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{new Date(item.createdAt?.toDate()).toLocaleString()}</p>
                           </div>
                         </div>
@@ -2140,13 +2352,65 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           <Trash2 className="h-5 w-5" />
                         </button>
                       </div>
-                      <div className="mt-4 text-slate-600 text-sm whitespace-pre-wrap">
+                      <div className="mt-4 text-slate-600 text-sm whitespace-pre-wrap leading-relaxed">
                         {item.content}
                       </div>
                     </div>
                   ))}
+                  {announcements.filter(a => !activeCourseId || a.courseId === activeCourseId).length === 0 && (
+                    <div className="py-20 text-center bg-slate-50 rounded-[3rem] border border-dashed border-slate-200">
+                      <Megaphone className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                      <p className="text-slate-400 font-medium italic">No announcements found for this course criteria.</p>
+                    </div>
+                  )}
                 </div>
               </>
+            )}
+
+            {activeTab === 'students' && (
+              <div className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Students & Batch Management</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {students.length} Registered Students
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {students.map((student) => (
+                    <div key={student.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between gap-6">
+                      <div className="flex items-center space-x-4 min-w-0">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
+                          {student.photoURL ? (
+                            <img src={student.photoURL} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Users className="h-6 w-6 text-slate-300" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-slate-900 truncate">{student.displayName || student.email}</h3>
+                          <p className="text-xs text-slate-400 truncate">{student.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-4">
+                        <div className="flex flex-col">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch Assignment</label>
+                          <input 
+                            type="text"
+                            defaultValue={student.batch || ""}
+                            onBlur={(e) => handleUpdateStudentBatch(student.id, e.target.value)}
+                            placeholder="Assign to Batch..."
+                            className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          />
+                        </div>
+                        <div className={`p-2 rounded-xl ${student.batch ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-300'}`}>
+                          <Users className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {activeTab === 'results' && (
@@ -2155,7 +2419,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Certification Result Sheet</h2>
                   <div className="flex space-x-2">
                      <span className="text-xs font-bold text-green-600 bg-green-50 px-4 py-1.5 rounded-full uppercase tracking-widest">
-                       {allScores.length} Records
+                       {allScores.filter(s => s.courseId === activeCourseId).length} Records
                      </span>
                   </div>
                 </div>
@@ -2171,7 +2435,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                        </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
-                        {allScores.map((score) => (
+                        {allScores.filter(s => s.courseId === activeCourseId).map((score) => (
                           <tr key={score.id} className="hover:bg-slate-50/50 transition-colors group">
                             <td className="px-8 py-5">
                               <div className="font-bold text-slate-900">{score.studentEmail}</div>
@@ -2202,10 +2466,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         ))}
                      </tbody>
                    </table>
-                   {allScores.length === 0 && (
+                   {allScores.filter(s => s.courseId === activeCourseId).length === 0 && (
                      <div className="py-20 text-center">
                         <Trophy className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-                        <p className="text-slate-400 font-medium italic">No results recorded yet. Start by entering marks on the left.</p>
+                        <p className="text-slate-400 font-medium italic">No results recorded for this course yet. Start by entering marks on the left.</p>
                      </div>
                    )}
                 </div>
@@ -2241,16 +2505,123 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </>
             )}
 
+            {activeTab === 'recordings' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Session Recording Library</h2>
+                    <p className="text-sm text-slate-500 font-medium">Video recordings of all past class sessions</p>
+                  </div>
+                  <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {recordings.filter(r => !activeCourseId || r.courseId === activeCourseId).length} Sessions
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {recordings.filter(r => !activeCourseId || r.courseId === activeCourseId).length > 0 ? recordings.filter(r => !activeCourseId || r.courseId === activeCourseId).map((rec) => (
+                    <div
+                      key={rec.id}
+                      className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-indigo-200/50 transition-all flex flex-col"
+                    >
+                      <div className="aspect-video bg-slate-900 rounded-2xl mb-6 relative overflow-hidden group">
+                        {/* Placeholder/Thumbnail for video */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-indigo-600/10 group-hover:bg-indigo-600/20 transition-all">
+                          <PlayCircle className="h-16 w-16 text-indigo-600 opacity-80 group-hover:opacity-100 transition-all" />
+                        </div>
+                        <div className="absolute top-4 right-4 z-10">
+                          <button
+                            onClick={() => deleteDoc(doc(db, 'classRecordings', rec.id))}
+                            className="p-3 bg-white/90 backdrop-blur-md text-red-600 hover:bg-red-600 hover:text-white rounded-xl shadow-lg transition-all"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full font-black uppercase tracking-widest leading-none">
+                            Chapter {rec.chapter}
+                          </span>
+                          {courses.find(c => c.id === rec.courseId) && (
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-black uppercase tracking-widest leading-none">
+                              {courses.find(c => c.id === rec.courseId)?.title}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2 truncate">{rec.title}</h3>
+                        <p className="text-sm text-slate-500 font-medium line-clamp-2 mb-4 leading-relaxed">
+                          {rec.description || 'No description provided for this session.'}
+                        </p>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+                        <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
+                          Added {new Date(rec.createdAt?.toDate()).toLocaleDateString()}
+                        </div>
+                        <a 
+                          href={rec.videoUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold text-indigo-600 hover:underline flex items-center space-x-1"
+                        >
+                          <span>Open Video</span>
+                          <ChevronRight className="h-4 w-4" />
+                        </a>
+                      </div>
+
+                      <div className="mt-6 pt-6 border-t border-slate-50">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Assign Recording Access</label>
+                        <div className="flex flex-wrap gap-3">
+                          {students.map((student) => {
+                            const isAssigned = rec.assignedTo?.includes(student.id);
+                            return (
+                              <button
+                                key={student.id}
+                                onClick={() => {
+                                  const newAssigned = isAssigned
+                                    ? (rec.assignedTo || []).filter((id: string) => id !== student.id)
+                                    : [...(rec.assignedTo || []), student.id];
+                                  handleAssignRecording(rec.id, newAssigned);
+                                }}
+                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${
+                                  isAssigned 
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
+                                    : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-indigo-200'
+                                }`}
+                              >
+                                {student.photoURL ? (
+                                  <img src={student.photoURL} className="w-4 h-4 rounded-full" alt="" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <Users className="w-3 h-3" />
+                                )}
+                                <span>{student.displayName || student.email}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="lg:col-span-2 py-20 text-center bg-slate-50 rounded-[3rem] border border-dashed border-slate-200">
+                      <Video className="h-16 w-16 text-slate-200 mx-auto mb-4" />
+                      <p className="text-slate-400 font-medium italic text-lg">No recordings found for this course criteria.</p>
+                      <p className="text-slate-300 text-sm">Use the form on the left to add your first session recording.</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
             {activeTab === 'materials' && (
               <>
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Course Materials</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {materials.filter(m => m.courseId === activeCourseId).length} Units
+                    {materials.filter(m => !activeCourseId || m.courseId === activeCourseId).length} Units
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-8">
-                  {materials.filter(m => m.courseId === activeCourseId).length > 0 ? materials.filter(m => m.courseId === activeCourseId).map((material) => (
+                  {materials.filter(m => !activeCourseId || m.courseId === activeCourseId).length > 0 ? materials.filter(m => !activeCourseId || m.courseId === activeCourseId).map((material) => (
                     <div
                       key={material.id}
                       className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
@@ -2324,11 +2695,11 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Live Schedule</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {liveClasses.filter(c => c.courseId === activeCourseId).length} Units
+                    {liveClasses.filter(c => !activeCourseId || c.courseId === activeCourseId).length} Units
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-8">
-                  {liveClasses.filter(c => c.courseId === activeCourseId).length > 0 ? liveClasses.filter(c => c.courseId === activeCourseId).map((liveClass) => (
+                  {liveClasses.filter(c => !activeCourseId || c.courseId === activeCourseId).length > 0 ? liveClasses.filter(c => !activeCourseId || c.courseId === activeCourseId).map((liveClass) => (
                     <div
                       key={liveClass.id}
                       className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
@@ -2409,11 +2780,11 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Course Flashcards</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {flashcardSets.filter(s => s.courseId === activeCourseId).length} Sets
+                    {flashcardSets.filter(s => !activeCourseId || s.courseId === activeCourseId).length} Sets
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-8">
-                  {flashcardSets.filter(s => s.courseId === activeCourseId).length > 0 ? flashcardSets.filter(s => s.courseId === activeCourseId).map((set) => (
+                  {flashcardSets.filter(s => !activeCourseId || s.courseId === activeCourseId).length > 0 ? flashcardSets.filter(s => !activeCourseId || s.courseId === activeCourseId).map((set) => (
                     <div
                       key={set.id}
                       className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
@@ -2542,6 +2913,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           </div>
         </div>
       )}
-    </div>
-  );
+    </main>
+  </div>
+);
 }

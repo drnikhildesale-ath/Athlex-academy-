@@ -48,7 +48,7 @@ export default function AuthPage() {
           
           <h1 className="text-3xl font-black text-slate-900 mb-3 tracking-tight">Welcome Back</h1>
           <p className="text-slate-500 mb-10 font-medium">
-            Join the elite circle of fitness professionals at Athlex Academy.
+            Join the elite circle of fitness professionals at Athlex Academy of Sports Science and Performance.
           </p>
 
           {error && (

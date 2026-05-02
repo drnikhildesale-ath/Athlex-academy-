@@ -168,7 +168,7 @@ export default function LandingPage() {
           >
             <div className="inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full text-blue-600 font-bold text-xs uppercase tracking-widest mb-6">
               <Award className="h-4 w-4" />
-              <span>Welcome to Athlex Academy</span>
+              <span>Welcome to Athlex Academy of Sports Science and Performance</span>
             </div>
             <h1 className="text-6xl lg:text-7xl font-black text-slate-900 leading-[1.1] mb-8">
               Master the Science of <span className="text-blue-600">Human Performance.</span>
@@ -587,14 +587,14 @@ export default function LandingPage() {
             />
           </div>
           <p className="text-slate-500 font-medium mb-8">
-            © {new Date().getFullYear()} Athlex Academy. All rights reserved.
+            © {new Date().getFullYear()} Athlex Academy of Sports Science and Performance. All rights reserved.
           </p>
           <div className="flex justify-center space-x-8">
             <a href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-green-600 transition-colors flex items-center space-x-2 group">
               <Phone className="h-5 w-5 group-hover:scale-110 transition-transform" />
               <span className="font-bold text-sm uppercase tracking-widest">WhatsApp</span>
             </a>
-            <a href="#" className="text-slate-400 hover:text-blue-600 transition-colors flex items-center space-x-2 group">
+            <a href="https://www.instagram.com/athlexacademy/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-600 transition-colors flex items-center space-x-2 group">
               <Instagram className="h-5 w-5 group-hover:scale-110 transition-transform" />
               <span className="font-bold text-sm uppercase tracking-widest">Instagram</span>
             </a>

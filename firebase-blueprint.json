@@ -10,6 +10,7 @@
         "displayName": { "type": "string" },
         "photoURL": { "type": "string", "format": "uri" },
         "role": { "type": "string", "enum": ["admin", "student"] },
+        "batch": { "type": "string", "description": "Student batch designation" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role"]
@@ -182,6 +183,8 @@
         "title": { "type": "string" },
         "content": { "type": "string" },
         "type": { "type": "string", "enum": ["info", "task", "urgent"] },
+        "courseId": { "type": "string", "description": "Optional: target course" },
+        "batch": { "type": "string", "description": "Optional: target batch" },
         "expiresAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }
@@ -225,12 +228,52 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["studentId", "courseId", "chapter", "createdAt"]
+    },
+    "ClassRecording": {
+      "title": "Class Recording",
+      "description": "Recorded sessions of past classes.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "chapter": { "type": "string" },
+        "courseId": { "type": "string", "description": "ID of the associated course" },
+        "videoUrl": { "type": "string", "format": "uri" },
+        "assignedTo": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "videoUrl", "courseId", "createdAt", "createdBy"]
+    },
+    "UserProgress": {
+      "title": "User Progress",
+      "description": "Tracking completion of course content for students.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "courseId": { "type": "string" },
+        "completedItems": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "IDs of completed materials, recordings, or quizzes"
+        },
+        "lastAccessedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "courseId", "completedItems"]
     }
   },
   "firestore": {
+    "/userProgress/{progressId}": {
+      "schema": "UserProgress",
+      "description": "Collection of student progress per course."
+    },
     "/courses/{courseId}": {
       "schema": "Course",
       "description": "Collection of available courses."
+    },
+    "/classRecordings/{recordingId}": {
+      "schema": "ClassRecording",
+      "description": "Collection of recorded class sessions."
     },
     "/feedbacks/{feedbackId}": {
       "schema": "Feedback",

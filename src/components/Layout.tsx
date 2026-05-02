@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { LogOut, User, Menu, X, Dumbbell } from 'lucide-react';
+import { LogOut, User, Menu, X, Dumbbell, Instagram, Phone, Linkedin, Youtube } from 'lucide-react';
 import { Chatbot } from './Chatbot';
 
 const logoImg = "https://lh3.googleusercontent.com/d/12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl";
@@ -166,16 +166,42 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div className="flex items-center space-x-6 mb-4 md:mb-0">
-              <a 
-                href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="hover:text-green-500 transition-colors"
-              >
-                WhatsApp Community
-              </a>
-              <p className="text-sm">© 2026 Athlex Academy. All rights reserved.</p>
+            <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-8">
+              <div className="flex items-center space-x-6">
+                <a 
+                  href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-green-500 transition-colors flex items-center space-x-2"
+                >
+                  <Phone className="h-4 w-4" />
+                  <span className="text-sm font-bold uppercase tracking-widest">WhatsApp</span>
+                </a>
+                <a 
+                  href="https://www.instagram.com/athlexacademy/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-blue-500 transition-colors flex items-center space-x-2"
+                >
+                  <Instagram className="h-4 w-4" />
+                  <span className="text-sm font-bold uppercase tracking-widest">Instagram</span>
+                </a>
+                <a 
+                  href="#" 
+                  className="hover:text-blue-700 transition-colors flex items-center space-x-2"
+                >
+                  <Linkedin className="h-4 w-4" />
+                  <span className="text-sm font-bold uppercase tracking-widest">LinkedIn</span>
+                </a>
+                <a 
+                  href="#" 
+                  className="hover:text-red-600 transition-colors flex items-center space-x-2"
+                >
+                  <Youtube className="h-4 w-4" />
+                  <span className="text-sm font-bold uppercase tracking-widest">YouTube</span>
+                </a>
+              </div>
+              <p className="text-sm">© {new Date().getFullYear()} Athlex Academy of Sports Science and Performance. All rights reserved.</p>
             </div>
           </div>
         </div>

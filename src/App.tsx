@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Layout from './components/Layout';
@@ -33,69 +33,67 @@ export default function App() {
         }
       }, 5000);
 
-      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
         clearTimeout(safetyTimeout);
         try {
           if (firebaseUser) {
-            // Check if user exists in Firestore, if not create profile
+            // Listen for user profile changes
             const userRef = doc(db, 'users', firebaseUser.uid);
-            let userSnap;
-            try {
-              userSnap = await getDoc(userRef);
-            } catch (err) {
-              handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
-            }
-
-            if (!userSnap?.exists()) {
-              const newUser = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
-                photoURL: firebaseUser.photoURL || '',
-                role: ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'].includes(firebaseUser.email || '') ? 'admin' : 'student',
-                createdAt: serverTimestamp()
-              };
-              
-              try {
-                await setDoc(userRef, newUser);
-                setUser(newUser);
-                setIsAdmin(newUser.role === 'admin');
-              } catch (err) {
-                handleFirestoreError(err, OperationType.CREATE, `users/${firebaseUser.uid}`);
-              }
-            } else {
-              const userData = userSnap.data();
-              const adminEmails = ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'];
-              const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
-              
-              // Auto-fix: If user has admin email but is marked as student, update Firestore
-              if (isAdminEmail && (userData as any).role !== 'admin') {
+            const unsubscribeUser = onSnapshot(userRef, async (userSnap) => {
+              if (!userSnap.exists()) {
+                const newUser = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
+                  photoURL: firebaseUser.photoURL || '',
+                  role: ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'].includes(firebaseUser.email || '') ? 'admin' : 'student',
+                  createdAt: serverTimestamp()
+                };
+                
                 try {
-                  await setDoc(userRef, { role: 'admin' }, { merge: true });
-                  (userData as any).role = 'admin';
+                  await setDoc(userRef, newUser);
                 } catch (err) {
-                  handleFirestoreError(err, OperationType.UPDATE, `users/${firebaseUser.uid}`);
+                  handleFirestoreError(err, OperationType.CREATE, `users/${firebaseUser.uid}`);
                 }
+              } else {
+                const userData = userSnap.data();
+                const adminEmails = ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'];
+                const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
+                
+                // Auto-fix: If user has admin email but is marked as student, update Firestore
+                if (isAdminEmail && (userData as any).role !== 'admin') {
+                  try {
+                    await setDoc(userRef, { role: 'admin' }, { merge: true });
+                  } catch (err) {
+                    handleFirestoreError(err, OperationType.UPDATE, `users/${firebaseUser.uid}`);
+                  }
+                }
+                
+                setUser(userData);
+                setIsAdmin((userData as any).role === 'admin' || isAdminEmail);
+                setLoading(false);
               }
-              
-              setUser(userData);
-              setIsAdmin((userData as any).role === 'admin' || isAdminEmail);
-            }
+            }, (err) => {
+              handleFirestoreError(err, OperationType.LIST, `users/${firebaseUser.uid}`);
+              setLoading(false);
+            });
+
+            return () => unsubscribeUser();
           } else {
             setUser(null);
             setIsAdmin(false);
+            setLoading(false);
           }
         } catch (error) {
           console.error("Auth State Error:", error);
           // Fallback: allow app to load even if Firestore check fails
           setUser(firebaseUser ? { uid: firebaseUser.uid, email: firebaseUser.email } : null);
           setIsAdmin(!!firebaseUser?.email && ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'].includes(firebaseUser.email));
-        } finally {
           setLoading(false);
         }
       });
 
-      return () => unsubscribe();
+      return () => unsubscribeAuth();
     } catch (e) {
       console.error("App useEffect crashed:", e);
       setLoading(false);
@@ -117,7 +115,7 @@ export default function App() {
               />
             </div>
           </div>
-          <p className="text-slate-400 font-black tracking-widest text-xs animate-pulse uppercase">Athlex Academy</p>
+          <p className="text-slate-400 font-black tracking-widest text-xs animate-pulse uppercase">Athlex Academy of Sports Science and Performance</p>
         </div>
       </div>
     );

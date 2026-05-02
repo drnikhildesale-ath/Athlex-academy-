@@ -19,7 +19,11 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
   const [exercises, setExercises] = React.useState<any[]>([]);
   const [knowledgeVideos, setKnowledgeVideos] = React.useState<any[]>([]);
   const [announcements, setAnnouncements] = React.useState<any[]>([]);
+  const [recordings, setRecordings] = React.useState<any[]>([]);
+  const [progress, setProgress] = React.useState<any | null>(null);
   const [chatMessages, setChatMessages] = React.useState<any[]>([]);
+  const [activeVideo, setActiveVideo] = React.useState<any | null>(null);
+  const [isPipMinimized, setIsPipMinimized] = React.useState(false);
   const [newMessage, setNewMessage] = React.useState('');
   const [scores, setScores] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -105,6 +109,15 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       setLiveClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'liveClasses'));
 
+    // Fetch assigned recordings
+    const recordingsQuery = query(
+      collection(db, 'classRecordings'),
+      where('assignedTo', 'array-contains', user.uid)
+    );
+    const unsubscribeRecordings = onSnapshot(recordingsQuery, (snapshot) => {
+      setRecordings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'classRecordings'));
+
     // Fetch assigned flashcard sets
     const flashcardsQuery = query(
       collection(db, 'flashcards'),
@@ -152,17 +165,36 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'scores'));
 
+    // Fetch progress
+    let unsubscribeProgress = () => {};
+    if (activeCourseId) {
+      const progressQuery = query(
+        collection(db, 'userProgress'),
+        where('uid', '==', user.uid),
+        where('courseId', '==', activeCourseId)
+      );
+      unsubscribeProgress = onSnapshot(progressQuery, (snapshot) => {
+        if (!snapshot.empty) {
+          setProgress({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
+        } else {
+          setProgress(null);
+        }
+      }, (error) => handleFirestoreError(error, OperationType.LIST, 'userProgress'));
+    }
+
     return () => {
       unsubscribeCourses();
       unsubscribeQuizzes();
       unsubscribeMaterials();
       unsubscribeLiveClasses();
+      unsubscribeRecordings();
       unsubscribeFlashcards();
       unsubscribeExercises();
       unsubscribeKnowledge();
       unsubscribeAnnouncements();
       unsubscribeChat();
       unsubscribeScores();
+      unsubscribeProgress();
     };
   }, [user.uid, activeCourseId, scores.length]);
 
@@ -207,6 +239,28 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     }
   };
 
+  const toggleItemCompletion = async (itemId: string) => {
+    if (!user?.uid || !activeCourseId) return;
+
+    try {
+      const { setDoc, doc, collection, serverTimestamp } = await import('firebase/firestore');
+      const completedItems = progress?.completedItems || [];
+      const newCompletedItems = completedItems.includes(itemId)
+        ? completedItems.filter((id: string) => id !== itemId)
+        : [...completedItems, itemId];
+
+      const progressId = progress?.id || `${user.uid}_${activeCourseId}`;
+      await setDoc(doc(db, 'userProgress', progressId), {
+        uid: user.uid,
+        courseId: activeCourseId,
+        completedItems: newCompletedItems,
+        lastAccessedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `userProgress/${user.uid}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -218,14 +272,23 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     );
   }
 
-    const averageScore = scores.length > 0 
-    ? Math.round(scores.reduce((acc, s) => acc + (s.score / s.totalQuestions), 0) / scores.length * 100)
+    const courseScores = scores.filter(s => !activeCourseId || s.courseId === activeCourseId);
+    const averageScore = courseScores.length > 0 
+    ? Math.round(courseScores.reduce((acc, s) => acc + (s.score / s.totalQuestions), 0) / courseScores.length * 100)
     : 0;
 
-  // Assuming 20 chapters for ACE-CPT for the roadmap
+  // Track progress based on completed items + quiz scores
+  const completedItems = progress?.completedItems || [];
+  const TOTAL_TARGET_ITEMS = recordings.filter(r => r.courseId === activeCourseId).length + 
+                           materials.filter(m => m.courseId === activeCourseId).length +
+                           quizzes.filter(q => q.courseId === activeCourseId).length;
+  
+  const currentCompletedCount = completedItems.length + courseScores.length;
+  const roadmapProgress = TOTAL_TARGET_ITEMS > 0 
+    ? Math.min(Math.round((currentCompletedCount / TOTAL_TARGET_ITEMS) * 100), 100)
+    : 0;
+
   const TOTAL_CHAPTERS = 20;
-  const completedChapters = Array.from(new Set(scores.map(s => s.chapter))).filter(Boolean).length;
-  const progressPercentage = Math.min(Math.round((completedChapters / TOTAL_CHAPTERS) * 100), 100);
 
   return (
     <motion.div 
@@ -314,7 +377,12 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       </div>
 
       {/* Announcements */}
-      {announcements.length > 0 && (
+      {announcements.filter(a => {
+        const isSystemWide = !a.courseId && !a.batch;
+        const matchesCourse = !a.courseId || a.courseId === activeCourseId;
+        const matchesBatch = !a.batch || a.batch === user.batch;
+        return isSystemWide || (matchesCourse && matchesBatch);
+      }).length > 0 && (
         <div className="mb-12 space-y-4">
           <div className="flex items-center space-x-3 mb-6">
             <div className="bg-red-50 p-2 rounded-lg">
@@ -323,7 +391,12 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             <h2 className="text-xl font-bold text-slate-900 tracking-tight">Announcements & Tasks</h2>
           </div>
           <div className="grid grid-cols-1 gap-4">
-            {announcements.map((ann) => (
+            {announcements.filter(a => {
+              const isSystemWide = !a.courseId && !a.batch;
+              const matchesCourse = !a.courseId || a.courseId === activeCourseId;
+              const matchesBatch = !a.batch || a.batch === user.batch;
+              return isSystemWide || (matchesCourse && matchesBatch);
+            }).map((ann) => (
               <motion.div
                 key={ann.id}
                 initial={{ opacity: 0, x: -20 }}
@@ -359,13 +432,13 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
         <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-slate-100 shadow-xl shadow-slate-200/50">
           <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6">
             <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Certification Roadmap</h2>
-              <p className="text-slate-500 font-medium italic text-sm">Your visual journey through the ACE-CPT curriculum</p>
+              <h2 className="text-3xl font-serif font-black text-slate-900 tracking-tight mb-2 italic">Certification Roadmap</h2>
+              <p className="text-slate-500 font-medium italic text-sm">Your visual journey through the Athlex Academy curriculum</p>
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-right">
-                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Chapters Completed</div>
-                <div className="text-2xl font-black text-blue-600">{completedChapters} / {TOTAL_CHAPTERS}</div>
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Mastery Progress</div>
+                <div className="text-2xl font-black text-blue-600">{roadmapProgress}%</div>
               </div>
               <div className="bg-blue-50 p-4 rounded-3xl">
                 <Award className="h-8 w-8 text-blue-600" />
@@ -378,7 +451,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             <div className="h-4 w-full bg-slate-100 rounded-full relative overflow-hidden shadow-inner">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: `${progressPercentage}%` }}
+                animate={{ width: `${roadmapProgress}%` }}
                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.4)]"
               />
             </div>
@@ -396,7 +469,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             {/* Moving Pointer */}
             <motion.div
               initial={{ left: '0%' }}
-              animate={{ left: `${progressPercentage}%` }}
+              animate={{ left: `${roadmapProgress}%` }}
               className="absolute top-3 -translate-x-1/2 z-20 flex flex-col items-center group cursor-default"
             >
               <div className="bg-white p-3 rounded-[1.25rem] shadow-2xl border border-blue-100 flex items-center justify-center -translate-y-4 group-hover:-translate-y-6 transition-transform duration-300">
@@ -416,8 +489,8 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                  { p: 75, label: "Advanced", icon: <Trophy className="h-4 w-4" /> },
                  { p: 100, label: "Certified", icon: <Award className="h-4 w-4" /> }
                ].map((m, i) => (
-                 <div key={i} className={`flex flex-col items-center ${progressPercentage >= m.p ? 'text-blue-600' : 'text-slate-300'}`}>
-                   <div className={`p-2 rounded-xl mb-2 transition-colors ${progressPercentage >= m.p ? 'bg-blue-50' : 'bg-slate-50'}`}>
+                 <div key={i} className={`flex flex-col items-center ${roadmapProgress >= m.p ? 'text-blue-600' : 'text-slate-300'}`}>
+                   <div className={`p-2 rounded-xl mb-2 transition-colors ${roadmapProgress >= m.p ? 'bg-blue-50' : 'bg-slate-50'}`}>
                      {m.icon}
                    </div>
                    <span className="text-[10px] font-black uppercase tracking-widest">{m.label}</span>
@@ -443,7 +516,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 Welcome back, <span className="text-blue-600">{user.displayName?.split(' ')[0]}!</span>
               </h1>
               <p className="text-lg text-slate-500 font-medium leading-relaxed">
-                You've completed <span className="text-slate-900 font-bold">{scores.length} quizzes</span> with an average score of <span className="text-blue-600 font-bold">{averageScore}%</span>. Keep pushing towards your ACE-CPT certification!
+                You've completed <span className="text-slate-900 font-bold">{courseScores.length} quizzes</span> with an average score of <span className="text-blue-600 font-bold">{averageScore}%</span>. Keep pushing towards your {courses.find(c => c.id === activeCourseId)?.title || 'ACE-CPT'} certification!
               </p>
             </div>
 
@@ -479,7 +552,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           className="lg:col-span-2 space-y-8"
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Signature Academy Quizzes</h2>
+            <h2 className="text-3xl font-serif font-black text-slate-900 tracking-tight italic">Academy Quizzes</h2>
             <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
               {quizzes.filter(q => q.courseId === activeCourseId).length} Available
             </span>
@@ -488,40 +561,51 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {quizzes.filter(q => q.courseId === activeCourseId).length > 0 ? quizzes.filter(q => q.courseId === activeCourseId).map((quiz, idx) => {
               const isGoogleForm = quiz.type === 'google_form';
+              const bestScore = courseScores.find(s => s.quizId === quiz.id);
+              const isCompleted = !!bestScore;
+              
               const CardContent = (
                 <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="group bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 transition-all relative overflow-hidden h-full"
+                  className={`group premium-card p-8 hover:-translate-y-2 transition-all relative overflow-hidden h-full ${isCompleted ? 'bg-indigo-50/20' : 'bg-white'}`}
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-[3rem] -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
                   
                   <div className="relative z-10">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 group-hover:rotate-6 ${isGoogleForm ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
-                      {isGoogleForm ? <Globe className="h-7 w-7" /> : <Dumbbell className="h-7 w-7" />}
+                    <div className="flex justify-between items-start mb-6">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:rotate-6 ${isCompleted ? 'bg-green-100 text-green-600' : isGoogleForm ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                        {isCompleted ? <CheckCircle2 className="h-7 w-7" /> : isGoogleForm ? <Globe className="h-7 w-7" /> : <BookCheck className="h-7 w-7" />}
+                      </div>
+                      {isCompleted && (
+                        <div className="bg-green-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg shadow-green-500/20">
+                          {Math.round((bestScore.score / bestScore.totalQuestions) * 100)}% Result
+                        </div>
+                      )}
                     </div>
+
                     <div className="flex items-center space-x-2 mb-2">
-                      <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{quiz.title}</h3>
+                      <h3 className="text-xl font-bold font-serif text-slate-900 group-hover:text-blue-600 transition-colors italic">{quiz.title}</h3>
                       {isGoogleForm && <ExternalLink className="h-4 w-4 text-slate-300" />}
                     </div>
                     <p className="text-slate-500 text-sm mb-6 line-clamp-2 leading-relaxed">
-                      {isGoogleForm ? "External Google Form Quiz. Click to open and complete." : (quiz.description || "Master the concepts from this chapter with our custom signature quizzes.")}
+                      {isGoogleForm ? "External Google Form Quiz. Master the concepts via signature assessment." : (quiz.description || "Master the core principles with our signature chapter-wise assessment.")}
                     </p>
                     
                     <div className="flex items-center justify-between pt-6 border-t border-slate-50">
                       <div className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-widest">
                         {isGoogleForm ? (
-                          <span className="flex items-center"><Globe className="h-4 w-4 mr-2" /> External Form</span>
+                          <span className="flex items-center"><Globe className="h-4 w-4 mr-2" /> Global Form</span>
                         ) : (
                           <>
-                            <Clock className="h-4 w-4 mr-2" />
+                            <Trophy className="h-4 w-4 mr-2" />
                             {quiz.questions?.length || 0} Questions
                           </>
                         )}
                       </div>
                       <div className="text-blue-600 font-black flex items-center text-sm uppercase tracking-widest">
-                        {isGoogleForm ? 'Open' : 'Start'} <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                        {isCompleted ? 'Review' : isGoogleForm ? 'Open' : 'Start'} <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                       </div>
                     </div>
                   </div>
@@ -546,6 +630,83 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 <p className="text-slate-500">Check back soon for new signature academy quizzes.</p>
               </div>
             )}
+          </div>
+
+          <div className="pt-8">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-serif font-black text-slate-900 tracking-tight italic">Class Sessions</h2>
+              <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                {recordings.filter(r => r.courseId === activeCourseId).length} Recordings
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {recordings.filter(r => r.courseId === activeCourseId).length > 0 ? recordings.filter(r => r.courseId === activeCourseId).map((rec, idx) => {
+                const isCompleted = completedItems.includes(rec.id);
+                return (
+                  <motion.div
+                    key={rec.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className={`group premium-card p-6 cursor-pointer overflow-hidden relative ${isCompleted ? 'bg-indigo-50/30' : 'bg-white'}`}
+                  >
+                    {isCompleted && (
+                      <div className="absolute top-4 left-4 z-20">
+                        <div className="bg-green-500 text-white p-1.5 rounded-full shadow-lg">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                      </div>
+                    )}
+                    <div 
+                      onClick={() => {
+                        setActiveVideo(rec);
+                        setIsPipMinimized(false);
+                      }}
+                      className="aspect-video bg-slate-900 rounded-[1.5rem] mb-6 relative overflow-hidden shadow-lg group-hover:shadow-indigo-500/20 transition-all"
+                    >
+                      <img 
+                        src={`https://img.youtube.com/vi/${rec.videoUrl.split('v=')[1]?.split('&')[0] || rec.videoUrl.split('/').pop()}/mqdefault.jpg`} 
+                        className={`w-full h-full object-cover transition-opacity duration-500 ${isCompleted ? 'opacity-40' : 'opacity-60 group-hover:opacity-80'}`}
+                        alt=""
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-white/20 backdrop-blur-md p-4 rounded-full group-hover:scale-110 transition-transform">
+                          <PlayCircle className="h-8 w-8 text-white" />
+                        </div>
+                      </div>
+                      <div className="absolute top-4 right-4">
+                        <span className="bg-slate-900/40 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-white/10">CH {rec.chapter}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <h3 className="text-xl font-bold font-serif text-slate-900 truncate group-hover:text-indigo-600 transition-colors italic">{rec.title}</h3>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleItemCompletion(rec.id);
+                        }}
+                        className={`p-2 rounded-xl transition-all ${isCompleted ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                      >
+                        <CheckCircle2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                      <span>{new Date(rec.createdAt?.toDate()).toLocaleDateString()}</span>
+                      <span className="flex items-center text-indigo-600 font-black">Play Session <ArrowRight className="h-3 w-3 ml-1" /></span>
+                    </div>
+                  </motion.div>
+                );
+              }) : (
+                <div className="col-span-full p-12 bg-white rounded-[3rem] border border-dashed border-slate-200 text-center">
+                  <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Video className="h-8 w-8 text-slate-300" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">No Recordings Yet</h3>
+                  <p className="text-slate-500">Check back later for recordings of past live sessions.</p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="pt-8">
@@ -738,40 +899,57 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           {/* Study Materials */}
           <div className="bg-slate-900 rounded-[3rem] p-8 text-white shadow-2xl shadow-blue-900/20 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
-            <h2 className="text-xl font-bold mb-8 flex items-center tracking-tight">
+            <h2 className="text-xl font-bold mb-8 flex items-center tracking-tight font-serif italic text-blue-400">
               <BookOpen className="h-6 w-6 mr-3 text-blue-500" />
-              Study Materials
+              Library
             </h2>
             <div className="space-y-4">
-              {materials.filter(m => m.courseId === activeCourseId).length > 0 ? materials.filter(m => m.courseId === activeCourseId).map((item) => (
-                <div 
-                  key={item.id} 
-                  onClick={() => {
-                    if (item.type === 'drive') {
-                      window.open(item.driveUrl, '_blank');
-                    } else {
-                      const win = window.open();
-                      if (win) {
-                        win.document.write(`<iframe src="${item.fileUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-                      }
-                    }
-                  }}
-                  className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-2.5 rounded-xl transition-colors ${item.type === 'drive' ? 'bg-blue-500/20 text-blue-400 group-hover:text-white' : 'bg-white/10 text-blue-400 group-hover:text-white'}`}>
-                      {item.type === 'drive' ? <Globe className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">{item.title}</div>
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                        Chapter {item.chapter} • {item.type === 'drive' ? 'Drive Link' : 'PDF'}
+              {materials.filter(m => m.courseId === activeCourseId).length > 0 ? materials.filter(m => m.courseId === activeCourseId).map((item) => {
+                const isCompleted = completedItems.includes(item.id);
+                return (
+                  <div 
+                    key={item.id} 
+                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${isCompleted ? 'bg-green-500/10 border-green-500/20' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                  >
+                    <div 
+                      onClick={() => {
+                        if (item.type === 'drive') {
+                          window.open(item.driveUrl, '_blank');
+                        } else {
+                          const win = window.open();
+                          if (win) {
+                            win.document.write(`<iframe src="${item.fileUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                          }
+                        }
+                      }}
+                      className="flex items-center space-x-4 flex-1 min-w-0"
+                    >
+                      <div className={`p-2.5 rounded-xl transition-colors ${isCompleted ? 'bg-green-500 text-white' : item.type === 'drive' ? 'bg-blue-500/20 text-blue-400 group-hover:text-white' : 'bg-white/10 text-blue-400 group-hover:text-white'}`}>
+                        {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : item.type === 'drive' ? <Globe className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className={`text-sm font-bold truncate ${isCompleted ? 'text-green-400' : 'text-white'}`}>{item.title}</div>
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                          Chapter {item.chapter} • {item.type === 'drive' ? 'Drive' : 'PDF'}
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center space-x-3">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleItemCompletion(item.id);
+                        }}
+                        className={`p-1.5 rounded-lg transition-all ${isCompleted ? 'text-green-400 hover:text-white' : 'text-slate-600 hover:text-white'}`}
+                        title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                      </button>
+                      <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-white transition-all" />
+                    </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-white transition-all" />
-                </div>
-              )) : (
+                );
+              }) : (
                 <p className="text-slate-500 text-sm italic text-center py-4">No materials assigned yet.</p>
               )}
             </div>
@@ -1038,6 +1216,69 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* In-App Picture-in-Picture Video Player */}
+        <AnimatePresence>
+          {activeVideo && (
+            <motion.div
+              layout
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
+              animate={{ 
+                opacity: 1, 
+                scale: 1, 
+                y: 0,
+                width: isPipMinimized ? 300 : '100%',
+                maxWidth: isPipMinimized ? 300 : 800,
+                height: isPipMinimized ? 180 : 'auto',
+                bottom: 24,
+                right: 24,
+                left: isPipMinimized ? 'auto' : '50%',
+                x: isPipMinimized ? 0 : '-50%',
+                position: 'fixed'
+              }}
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              className={`z-[100] bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden border border-slate-700/50 flex flex-col`}
+            >
+              <div className="flex items-center justify-between p-4 bg-slate-800/80 backdrop-blur-md border-b border-slate-700/50">
+                <div className="flex items-center space-x-3 overflow-hidden">
+                  <PlayCircle className="h-5 w-5 text-blue-400 shrink-0" />
+                  <span className="text-white text-xs font-bold truncate tracking-tight">{activeVideo.title}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={() => setIsPipMinimized(!isPipMinimized)}
+                    className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  >
+                    {isPipMinimized ? <ArrowRight className="h-4 w-4" /> : <X className="h-4 w-4 rotate-45" />}
+                  </button>
+                  <button 
+                    onClick={() => setActiveVideo(null)}
+                    className="p-1.5 hover:bg-red-600 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className={`aspect-video w-full relative group ${isPipMinimized ? 'h-full' : ''}`}>
+                <iframe
+                  src={activeVideo.videoUrl.includes('youtube.com/watch?v=') 
+                    ? `https://www.youtube.com/embed/${activeVideo.videoUrl.split('v=')[1]?.split('&')[0]}?autoplay=1` 
+                    : activeVideo.videoUrl}
+                  className="w-full h-full border-0 absolute inset-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+                {isPipMinimized && (
+                  <div 
+                    onClick={() => setIsPipMinimized(false)}
+                    className="absolute inset-0 bg-transparent cursor-pointer z-10" 
+                  />
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

@@ -191,6 +191,15 @@ service cloud.firestore {
              data.createdBy == request.auth.uid;
     }
 
+    function isValidClassRecording(data) {
+      return hasRequiredFields(['title', 'videoUrl', 'courseId', 'createdAt', 'createdBy']) &&
+             data.title is string && data.title.size() > 0 &&
+             isValidUrl(data.videoUrl) &&
+             data.courseId is string &&
+             data.createdAt is timestamp &&
+             data.createdBy == request.auth.uid;
+    }
+
     function isValidChatMessage(data) {
       return hasRequiredFields(['studentId', 'senderId', 'text', 'createdAt']) &&
              data.studentId is string &&
@@ -218,6 +227,19 @@ service cloud.firestore {
       allow update: if isAuthenticated() && 
                     ((isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin());
       
+      allow delete: if isAdmin();
+    }
+
+    function isValidUserProgress(data) {
+      return hasRequiredFields(['uid', 'courseId', 'completedItems']) &&
+             data.uid == request.auth.uid &&
+             data.courseId is string &&
+             data.completedItems is list;
+    }
+
+    match /userProgress/{progressId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create, update: if isAuthenticated() && isValidUserProgress(request.resource.data);
       allow delete: if isAdmin();
     }
 
@@ -329,6 +351,11 @@ service cloud.firestore {
       allow create: if isAdmin() && isValidAnnouncement(request.resource.data);
       allow update: if isAdmin() && isValidAnnouncement(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    match /classRecordings/{recordingId} {
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid in resource.data.assignedTo);
+      allow create, update, delete: if isAdmin() && isValidClassRecording(request.resource.data);
     }
 
     match /chatMessages/{messageId} {

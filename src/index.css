@@ -1,6 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --animate-bounce-slow: bounce-slow 3s infinite;
 
   @keyframes bounce-slow {
@@ -15,12 +20,32 @@
   }
 }
 
-html {
-  scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    @apply bg-[#FDFCFB] text-slate-900 antialiased selection:bg-indigo-100 selection:text-indigo-900;
+  }
 }
 
-body {
-  @apply bg-slate-50 text-slate-900;
+@layer components {
+  .premium-card {
+    @apply bg-white border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] rounded-[2.5rem] transition-all hover:shadow-[0_20px_40px_rgb(0,0,0,0.04)] hover:border-slate-200/60;
+  }
+  
+  .premium-blur {
+    @apply backdrop-blur-xl bg-white/80 border border-white/20;
+  }
+
+  .glass-surface {
+    @apply bg-white/40 backdrop-blur-md border border-white/20;
+  }
+
+  .markdown-body {
+    @apply prose prose-slate prose-sm md:prose-base max-w-none prose-headings:font-serif prose-headings:font-black prose-headings:tracking-tight prose-p:leading-relaxed prose-strong:text-slate-900;
+  }
 }
