@@ -22,6 +22,7 @@
         "title": { "type": "string" },
         "description": { "type": "string" },
         "chapter": { "type": "string", "description": "Chapter number or range (e.g., '1', '1-5')" },
+        "courseId": { "type": "string", "description": "ID of the associated course" },
         "difficulty": { "type": "string", "enum": ["Easy", "Medium", "Hard"] },
         "pointsPerQuestion": { "type": "integer" },
         "status": { "type": "string", "enum": ["draft", "published"] },
@@ -67,6 +68,7 @@
         "title": { "type": "string" },
         "description": { "type": "string" },
         "chapter": { "type": "string" },
+        "courseId": { "type": "string", "description": "ID of the associated course" },
         "type": { "type": "string", "enum": ["pdf", "drive"], "description": "Type of material: PDF upload or Google Drive link." },
         "fileUrl": { "type": "string", "description": "URL to the PDF file or base64 data." },
         "driveUrl": { "type": "string", "format": "uri", "description": "Link to Google Drive folder or file." },
@@ -83,6 +85,7 @@
       "properties": {
         "title": { "type": "string" },
         "description": { "type": "string" },
+        "courseId": { "type": "string", "description": "ID of the associated course" },
         "link": { "type": "string", "format": "uri" },
         "recordingLink": { "type": "string", "format": "uri" },
         "scheduledAt": { "type": "string", "format": "date-time" },
@@ -127,6 +130,7 @@
         "title": { "type": "string" },
         "description": { "type": "string" },
         "chapter": { "type": "string" },
+        "courseId": { "type": "string", "description": "ID of the associated course" },
         "cards": {
           "type": "array",
           "items": {
@@ -143,9 +147,95 @@
         "createdBy": { "type": "string" }
       },
       "required": ["title", "cards", "createdAt", "createdBy"]
+    },
+    "Exercise": {
+      "title": "Exercise",
+      "description": "An exercise video tutorial for the digital library.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string", "description": "e.g., 'Lower Body', 'Core'" },
+        "videoUrl": { "type": "string", "format": "uri" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "videoUrl", "createdAt"]
+    },
+    "KnowledgeVideo": {
+      "title": "Knowledge Sharing Video",
+      "description": "Informative videos on fitness, sports, health, and nutrition.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["Fitness", "Sports", "Health", "Nutrition"] },
+        "videoUrl": { "type": "string", "format": "uri" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "category", "videoUrl", "createdAt"]
+    },
+    "Announcement": {
+      "title": "Admin Announcement",
+      "description": "Important messages or tasks from admin to students.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "task", "urgent"] },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "content", "type", "createdAt", "createdBy"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Messages for 2-way communication between students and admin.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "description": "The UID of the student involved in the chat." },
+        "senderId": { "type": "string", "description": "The UID of the message sender." },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "senderId", "text", "createdAt"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "A curriculum or program.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "createdAt"]
+    },
+    "Feedback": {
+      "title": "Module Feedback",
+      "description": "Student feedback on a specific chapter.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "chapter": { "type": "string" },
+        "understandingRating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "teachingRating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "courseId", "chapter", "createdAt"]
     }
   },
   "firestore": {
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Collection of available courses."
+    },
+    "/feedbacks/{feedbackId}": {
+      "schema": "Feedback",
+      "description": "Collection of student chapter feedback."
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profile documents."
@@ -177,6 +267,22 @@
     "/flashcards/{setId}": {
       "schema": "FlashcardSet",
       "description": "Collection of chapter flashcards."
+    },
+    "/exercises/{exerciseId}": {
+      "schema": "Exercise",
+      "description": "Exercise library videos."
+    },
+    "/knowledgeVideos/{videoId}": {
+      "schema": "KnowledgeVideo",
+      "description": "Knowledge sharing videos."
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Admin announcements."
+    },
+    "/chatMessages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat messages between students and admin."
     }
   }
 }

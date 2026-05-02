@@ -153,6 +153,53 @@ service cloud.firestore {
              data.createdBy == request.auth.uid;
     }
 
+    function isValidCourse(data) {
+      return hasRequiredFields(['title', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidFeedback(data) {
+      return hasRequiredFields(['studentId', 'courseId', 'chapter', 'createdAt']) &&
+             data.studentId == request.auth.uid &&
+             data.courseId is string &&
+             data.chapter is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidExercise(data) {
+      return hasRequiredFields(['name', 'videoUrl', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 &&
+             isValidUrl(data.videoUrl) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidKnowledgeVideo(data) {
+      return hasRequiredFields(['title', 'category', 'videoUrl', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 &&
+             data.category in ['Fitness', 'Sports', 'Health', 'Nutrition'] &&
+             isValidUrl(data.videoUrl) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidAnnouncement(data) {
+      return hasRequiredFields(['title', 'content', 'type', 'createdAt', 'createdBy']) &&
+             data.title is string && data.title.size() > 0 &&
+             data.content is string && data.content.size() > 0 &&
+             data.type in ['info', 'task', 'urgent'] &&
+             data.createdAt is timestamp &&
+             data.createdBy == request.auth.uid;
+    }
+
+    function isValidChatMessage(data) {
+      return hasRequiredFields(['studentId', 'senderId', 'text', 'createdAt']) &&
+             data.studentId is string &&
+             data.senderId == request.auth.uid &&
+             data.text is string && data.text.size() > 0 &&
+             data.createdAt is timestamp &&
+             (isAdmin() || request.auth.uid == data.studentId);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -172,6 +219,17 @@ service cloud.firestore {
                     ((isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin());
       
       allow delete: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() && isValidCourse(request.resource.data);
+    }
+
+    match /feedbacks/{feedbackId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidFeedback(request.resource.data);
+      allow update, delete: if isAdmin();
     }
 
     match /quizzes/{quizId} {
@@ -250,6 +308,38 @@ service cloud.firestore {
       allow create: if isAdmin() && isValidFlashcardSet(request.resource.data);
       allow update: if isAdmin() && isValidFlashcardSet(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    match /exercises/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidExercise(request.resource.data);
+      allow update: if isAdmin() && isValidExercise(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /knowledgeVideos/{videoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidKnowledgeVideo(request.resource.data);
+      allow update: if isAdmin() && isValidKnowledgeVideo(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidAnnouncement(request.resource.data);
+      allow update: if isAdmin() && isValidAnnouncement(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /chatMessages/{messageId} {
+      // Admins can read all chat messages. Students can only read their own thread.
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.studentId == request.auth.uid);
+      
+      // Admins can send to any student. Students can send to admin.
+      allow create: if isAuthenticated() && isValidChatMessage(request.resource.data);
+      
+      // Messages are immutable once sent.
+      allow update, delete: if false;
     }
   }
 }

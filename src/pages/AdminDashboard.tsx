@@ -4,7 +4,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, delete
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
-import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck } from 'lucide-react';
+import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -37,8 +37,41 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [students, setStudents] = React.useState<any[]>([]);
   const [successStories, setSuccessStories] = React.useState<any[]>([]);
   const [flashcardSets, setFlashcardSets] = React.useState<any[]>([]);
+  const [exercises, setExercises] = React.useState<any[]>([]);
+  const [knowledgeVideos, setKnowledgeVideos] = React.useState<any[]>([]);
+  const [announcements, setAnnouncements] = React.useState<any[]>([]);
+  const [chatMessages, setChatMessages] = React.useState<any[]>([]);
+  const [courses, setCourses] = React.useState<any[]>([]);
+  const [activeCourseId, setActiveCourseId] = React.useState<string>('');
+  const [courseTitle, setCourseTitle] = React.useState('');
+  const [courseDescription, setCourseDescription] = React.useState('');
+  const [selectedStudentForChat, setSelectedStudentForChat] = React.useState<any>(null);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards'>('quizzes');
+  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses'>('quizzes');
+
+  // Manual Result Form
+  const [selectedStudentId, setSelectedStudentId] = React.useState('');
+  const [resultChapter, setResultChapter] = React.useState('1');
+  const [resultScore, setResultScore] = React.useState(0);
+  const [resultTotal, setResultTotal] = React.useState(100);
+  const [resultTitle, setResultTitle] = React.useState('Chapter Performance');
+
+  // New Content Forms
+  const [exerciseName, setExerciseName] = React.useState('');
+  const [exerciseCategory, setExerciseCategory] = React.useState('Lower Body');
+  const [exerciseVideoUrl, setExerciseVideoUrl] = React.useState('');
+  const [exerciseDescription, setExerciseDescription] = React.useState('');
+
+  const [knowledgeTitle, setKnowledgeTitle] = React.useState('');
+  const [knowledgeCategory, setKnowledgeCategory] = React.useState('Fitness');
+  const [knowledgeVideoUrl, setKnowledgeVideoUrl] = React.useState('');
+  const [knowledgeDescription, setKnowledgeDescription] = React.useState('');
+
+  const [announcementTitle, setAnnouncementTitle] = React.useState('');
+  const [announcementContent, setAnnouncementContent] = React.useState('');
+  const [announcementType, setAnnouncementType] = React.useState<'info' | 'task' | 'urgent'>('info');
+
+  const [newMessage, setNewMessage] = React.useState('');
 
   // Flashcard Form
   const [flashcardTitle, setFlashcardTitle] = React.useState('');
@@ -106,6 +139,30 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setFlashcardSets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'flashcards'));
 
+    const unsubscribeExercises = onSnapshot(query(collection(db, 'exercises'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'exercises'));
+
+    const unsubscribeKnowledge = onSnapshot(query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setKnowledgeVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'knowledgeVideos'));
+
+    const unsubscribeAnnouncements = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
+
+    const unsubscribeChats = onSnapshot(query(collection(db, 'chatMessages'), orderBy('createdAt', 'asc')), (snapshot) => {
+      setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'chatMessages'));
+
+    const unsubscribeCourses = onSnapshot(query(collection(db, 'courses'), orderBy('createdAt', 'desc')), (snapshot) => {
+      const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCourses(fetchedCourses);
+      if (fetchedCourses.length > 0 && !activeCourseId) {
+        setActiveCourseId(fetchedCourses[0].id);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'courses'));
+
     return () => {
       unsubscribeQuizzes();
       unsubscribeStudents();
@@ -114,8 +171,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       unsubscribeInquiries();
       unsubscribeStories();
       unsubscribeFlashcards();
+      unsubscribeExercises();
+      unsubscribeKnowledge();
+      unsubscribeAnnouncements();
+      unsubscribeChats();
+      unsubscribeCourses();
     };
-  }, []);
+  }, [activeCourseId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -195,7 +257,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   };
 
   const handlePublishQuiz = async (isDraft: boolean = false) => {
-    if (!quizTitle) return;
+    if (!quizTitle || !activeCourseId) {
+      if (!activeCourseId) setStatus({ type: 'error', message: "Please select/create a course first." });
+      return;
+    }
     if (quizType === 'ai' && !draftQuiz) return;
     if (quizType === 'google_form' && !googleFormUrl) return;
 
@@ -203,6 +268,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       const quizData: any = {
         title: quizTitle,
         chapter: chapter,
+        courseId: activeCourseId,
         status: isDraft ? 'draft' : 'published',
         type: quizType,
         assignedTo: [],
@@ -242,7 +308,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!materialTitle) return;
+    if (!materialTitle || !activeCourseId) return;
     if (materialType === 'pdf' && !materialFile) return;
     if (materialType === 'drive' && !driveUrl) return;
 
@@ -250,6 +316,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       await addDoc(collection(db, 'materials'), {
         title: materialTitle,
         chapter: materialChapter,
+        courseId: activeCourseId,
         type: materialType,
         fileUrl: materialType === 'pdf' ? materialFile : null,
         driveUrl: materialType === 'drive' ? driveUrl : null,
@@ -268,11 +335,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   const handleCreateLiveClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!liveClassTitle || !liveClassLink) return;
+    if (!liveClassTitle || !liveClassLink || !activeCourseId) return;
 
     try {
       await addDoc(collection(db, 'liveClasses'), {
         title: liveClassTitle,
+        courseId: activeCourseId,
         link: liveClassLink,
         recordingLink: liveClassRecordingLink || null,
         scheduledAt: liveClassDate ? new Date(liveClassDate) : serverTimestamp(),
@@ -402,12 +470,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   };
 
   const handleSaveFlashcards = async () => {
-    if (!flashcardTitle || !draftFlashcards) return;
+    if (!flashcardTitle || !draftFlashcards || !activeCourseId) return;
 
     try {
       await addDoc(collection(db, 'flashcards'), {
         title: flashcardTitle,
         chapter: flashcardChapter,
+        courseId: activeCourseId,
         cards: draftFlashcards,
         assignedTo: [],
         createdAt: serverTimestamp(),
@@ -433,6 +502,152 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleCreateExercise = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!exerciseName || !exerciseVideoUrl) return;
+
+    try {
+      await addDoc(collection(db, 'exercises'), {
+        name: exerciseName,
+        category: exerciseCategory,
+        videoUrl: exerciseVideoUrl,
+        description: exerciseDescription,
+        createdAt: serverTimestamp()
+      });
+      setExerciseName('');
+      setExerciseVideoUrl('');
+      setExerciseDescription('');
+      setStatus({ type: 'success', message: "Exercise added to library!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'exercises');
+    }
+  };
+
+  const handleCreateKnowledgeVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!knowledgeTitle || !knowledgeVideoUrl) return;
+
+    try {
+      await addDoc(collection(db, 'knowledgeVideos'), {
+        title: knowledgeTitle,
+        category: knowledgeCategory,
+        videoUrl: knowledgeVideoUrl,
+        description: knowledgeDescription,
+        createdAt: serverTimestamp()
+      });
+      setKnowledgeTitle('');
+      setKnowledgeVideoUrl('');
+      setKnowledgeDescription('');
+      setStatus({ type: 'success', message: "Knowledge sharing video added!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'knowledgeVideos');
+    }
+  };
+
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announcementTitle || !announcementContent) return;
+
+    try {
+      await addDoc(collection(db, 'announcements'), {
+        title: announcementTitle,
+        content: announcementContent,
+        type: announcementType,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid
+      });
+      setAnnouncementTitle('');
+      setAnnouncementContent('');
+      setStatus({ type: 'success', message: "Announcement published to students!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'announcements');
+    }
+  };
+
+  const [allScores, setAllScores] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (!user) return;
+    const scoresQuery = query(collection(db, 'scores'), orderBy('completedAt', 'desc'));
+    const unsubscribeScores = onSnapshot(scoresQuery, (snapshot) => {
+      setAllScores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'scores'));
+    return () => unsubscribeScores();
+  }, [user]);
+
+  const handleRecordResult = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudentId || !resultChapter) return;
+
+    const student = students.find(s => s.id === selectedStudentId);
+
+    try {
+      await addDoc(collection(db, 'scores'), {
+        studentId: selectedStudentId,
+        studentEmail: student?.email || 'Unknown',
+        quizTitle: resultTitle || `Chapter ${resultChapter} Performance`,
+        chapter: resultChapter,
+        score: resultScore,
+        totalQuestions: resultTotal,
+        completedAt: serverTimestamp(),
+        manualEntry: true
+      });
+      
+      setResultChapter(String(parseInt(resultChapter) + 1));
+      setResultScore(0);
+      setStatus({ type: 'success', message: "Student results recorded successfully!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'scores');
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage || !selectedStudentForChat) return;
+
+    try {
+      await addDoc(collection(db, 'chatMessages'), {
+        studentId: selectedStudentForChat.id,
+        senderId: user.uid,
+        text: newMessage,
+        createdAt: serverTimestamp()
+      });
+      setNewMessage('');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'chatMessages');
+    }
+  };
+
+  const handleDeleteExercise = async (id: string) => {
+    if (window.confirm("Delete this exercise?")) {
+      try {
+        await deleteDoc(doc(db, 'exercises', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `exercises/${id}`);
+      }
+    }
+  };
+
+  const handleDeleteKnowledgeVideo = async (id: string) => {
+    if (window.confirm("Delete this video?")) {
+      try {
+        await deleteDoc(doc(db, 'knowledgeVideos', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `knowledgeVideos/${id}`);
+      }
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (window.confirm("Delete this announcement?")) {
+      try {
+        await deleteDoc(doc(db, 'announcements', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `announcements/${id}`);
+      }
+    }
+  };
+
   const handleDeleteFlashcards = async (id: string) => {
     if (window.confirm("Delete this flashcard set?")) {
       try {
@@ -443,15 +658,65 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleCreateCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!courseTitle) return;
+    try {
+      await addDoc(collection(db, 'courses'), {
+        title: courseTitle,
+        description: courseDescription,
+        createdAt: serverTimestamp()
+      });
+      setCourseTitle('');
+      setCourseDescription('');
+      setStatus({ type: 'success', message: "Course created successfully!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'courses');
+    }
+  };
+
+  const handleDeleteCourse = async (id: string) => {
+    if (window.confirm("Delete this course and all associated materials? (Materials will effectively be orphaned or invisible to students in this course)")) {
+      try {
+        await deleteDoc(doc(db, 'courses', id));
+        if (activeCourseId === id) setActiveCourseId('');
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `courses/${id}`);
+      }
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-12"
+        className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6"
       >
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Admin Command Center</h1>
-        <p className="text-slate-500 font-medium">Manage signature academy quizzes and content for your students.</p>
+        <div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Admin Command Center</h1>
+          <p className="text-slate-500 font-medium">Manage multiple courses and multi-dimensional content.</p>
+        </div>
+        
+        {/* Course Dropdown */}
+        <div className="bg-white p-4 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 flex items-center space-x-4">
+          <div className="text-right hidden sm:block">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Course Context</div>
+            <div className="text-sm font-bold text-slate-900 truncate max-w-[200px]">
+              {courses.find(c => c.id === activeCourseId)?.title || "Select a course..."}
+            </div>
+          </div>
+          <select 
+            value={activeCourseId}
+            onChange={(e) => setActiveCourseId(e.target.value)}
+            className="bg-slate-50 border border-slate-100 rounded-2xl px-6 py-3 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="">Switch Course...</option>
+            {courses.map(course => (
+              <option key={course.id} value={course.id}>{course.title}</option>
+            ))}
+          </select>
+        </div>
       </motion.div>
 
       {/* Tab Navigation */}
@@ -460,7 +725,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           { id: 'quizzes', label: 'Quizzes', icon: <Dumbbell className="h-4 w-4" /> },
           { id: 'materials', label: 'Study Materials', icon: <FileText className="h-4 w-4" /> },
           { id: 'liveClasses', label: 'Live Classes', icon: <Video className="h-4 w-4" /> },
+          { id: 'exercises', label: 'Exercise Library', icon: <Activity className="h-4 w-4" /> },
+          { id: 'knowledge', label: 'Knowledge Hub', icon: <Lightbulb className="h-4 w-4" /> },
           { id: 'flashcards', label: 'Flashcards', icon: <BookCheck className="h-4 w-4" /> },
+          { id: 'announcements', label: 'Announcements', icon: <Megaphone className="h-4 w-4" /> },
+          { id: 'courses', label: 'Manage Courses', icon: <Globe className="h-4 w-4" /> },
+          { id: 'results', label: 'Result Sheet', icon: <BookCheck className="h-4 w-4" /> },
+          { id: 'chats', label: 'Student Chats', icon: <MessageSquare className="h-4 w-4" /> },
           { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-4 w-4" /> },
           { id: 'stories', label: 'Success Stories', icon: <Trophy className="h-4 w-4" /> }
         ].map((tab) => (
@@ -558,6 +829,56 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Generator Form Column */}
           <div className="lg:col-span-1">
+            {activeTab === 'courses' && (
+              <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-indigo-50 p-3 rounded-2xl">
+                    <Globe className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Create New Course</h2>
+                </div>
+
+                <form onSubmit={handleCreateCourse} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Course Title</label>
+                    <input
+                      type="text"
+                      value={courseTitle}
+                      onChange={(e) => setCourseTitle(e.target.value)}
+                      placeholder="e.g. ACE Certified Personal Trainer"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Course Description</label>
+                    <textarea
+                      value={courseDescription}
+                      onChange={(e) => setCourseDescription(e.target.value)}
+                      placeholder="Describe the course curriculum..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all font-medium h-32 resize-none"
+                    />
+                  </div>
+
+                  {status && activeTab === 'courses' && (
+                    <div className={`p-4 rounded-2xl flex items-center space-x-3 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
+                      status.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                    }`}>
+                      {status.type === 'success' ? <CheckCircle2 className="h-5 w-5 flex-shrink-0" /> : <AlertCircle className="h-5 w-5 flex-shrink-0" />}
+                      <span>{status.message}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-500/20"
+                  >
+                    Initialize Course
+                  </button>
+                </form>
+              </div>
+            )}
+
             {activeTab === 'quizzes' && (
               <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
                 <div className="flex items-center space-x-3 mb-8">
@@ -920,13 +1241,373 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </div>
             )}
 
+            {activeTab === 'exercises' && (
+              <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-blue-50 p-3 rounded-2xl">
+                    <Activity className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Add Exercise Library Video</h2>
+                </div>
+
+                <form onSubmit={handleCreateExercise} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Exercise Name</label>
+                    <input
+                      type="text"
+                      value={exerciseName}
+                      onChange={(e) => setExerciseName(e.target.value)}
+                      placeholder="e.g. Barbell Back Squat"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Category</label>
+                    <select
+                      value={exerciseCategory}
+                      onChange={(e) => setExerciseCategory(e.target.value)}
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                    >
+                      {['Lower Body', 'Upper Body', 'Core', 'Warm-up', 'Biomechanics'].map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">YouTube URL</label>
+                    <input
+                      type="url"
+                      value={exerciseVideoUrl}
+                      onChange={(e) => setExerciseVideoUrl(e.target.value)}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Description/Biomechanics Notes</label>
+                    <textarea
+                      value={exerciseDescription}
+                      onChange={(e) => setExerciseDescription(e.target.value)}
+                      placeholder="Key cues and biomechanical analysis..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium h-32 resize-none"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"
+                  >
+                    Add to Library
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {activeTab === 'knowledge' && (
+              <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-amber-50 p-3 rounded-2xl">
+                    <Lightbulb className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Share Knowledge Video</h2>
+                </div>
+
+                <form onSubmit={handleCreateKnowledgeVideo} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Video Title</label>
+                    <input
+                      type="text"
+                      value={knowledgeTitle}
+                      onChange={(e) => setKnowledgeTitle(e.target.value)}
+                      placeholder="e.g. Understanding Macronutrients"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Topic Category</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Fitness', 'Sports', 'Health', 'Nutrition'].map(cat => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setKnowledgeCategory(cat)}
+                          className={`py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${knowledgeCategory === cat ? 'bg-amber-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Video URL</label>
+                    <input
+                      type="url"
+                      value={knowledgeVideoUrl}
+                      onChange={(e) => setKnowledgeVideoUrl(e.target.value)}
+                      placeholder="Youtube/Vimeo link"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Summary</label>
+                    <textarea
+                      value={knowledgeDescription}
+                      onChange={(e) => setKnowledgeDescription(e.target.value)}
+                      placeholder="Key takeaways from this video..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:bg-white transition-all font-medium h-32 resize-none"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-amber-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-amber-700 transition-all shadow-xl shadow-amber-500/20"
+                  >
+                    Post Video
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {activeTab === 'announcements' && (
+              <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-red-50 p-3 rounded-2xl">
+                    <Megaphone className="h-6 w-6 text-red-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">New Announcement</h2>
+                </div>
+
+                <form onSubmit={handleCreateAnnouncement} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Topic/Title</label>
+                    <input
+                      type="text"
+                      value={announcementTitle}
+                      onChange={(e) => setAnnouncementTitle(e.target.value)}
+                      placeholder="e.g. Final Exam Date Announced"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Priority Level</label>
+                    <div className="flex space-x-2">
+                      {['info', 'task', 'urgent'].map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setAnnouncementType(type as any)}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${announcementType === type ? 'bg-red-600 text-white shadow-lg shadow-red-500/20' : 'bg-slate-50 text-slate-500'}`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Message Content</label>
+                    <textarea
+                      value={announcementContent}
+                      onChange={(e) => setAnnouncementContent(e.target.value)}
+                      placeholder="Describe the task or news for students..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:bg-white transition-all font-medium h-48 resize-none"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-all shadow-xl shadow-red-500/20"
+                  >
+                    Send to All Dashboards
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {activeTab === 'results' && (
+              <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-green-50 p-3 rounded-2xl">
+                    <Trophy className="h-6 w-6 text-green-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Record Result</h2>
+                </div>
+
+                <form onSubmit={handleRecordResult} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Student</label>
+                    <select
+                      value={selectedStudentId}
+                      onChange={(e) => setSelectedStudentId(e.target.value)}
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    >
+                      <option value="">Select Student...</option>
+                      {students.map(s => (
+                        <option key={s.id} value={s.id}>{s.displayName || s.email}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Chapter</label>
+                      <input
+                        type="text"
+                        value={resultChapter}
+                        onChange={(e) => setResultChapter(e.target.value)}
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Score</label>
+                      <input
+                        type="number"
+                        value={resultScore}
+                        onChange={(e) => setResultScore(parseInt(e.target.value))}
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all font-medium"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {status && activeTab === 'results' && (
+                    <div className={`p-4 rounded-2xl flex items-center space-x-3 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
+                      status.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                    }`}>
+                      {status.type === 'success' ? <CheckCircle2 className="h-5 w-5 flex-shrink-0" /> : <AlertCircle className="h-5 w-5 flex-shrink-0" />}
+                      <span>{status.message}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-700 transition-all shadow-xl shadow-green-500/20"
+                  >
+                    Post Result
+                  </button>
+
+                  {selectedStudentId && (
+                    <div className="pt-6 border-t border-slate-50 mt-6 animate-in fade-in slide-in-from-bottom-2">
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Live Progress Preview</label>
+                       {(() => {
+                         const studentScores = allScores.filter(s => s.studentId === selectedStudentId);
+                         const progress = Math.min(Math.round((Array.from(new Set(studentScores.map(s => s.chapter))).filter(Boolean).length / 20) * 100), 100);
+                         return (
+                           <div className="space-y-3">
+                             <div className="flex justify-between items-end">
+                               <span className="text-xs font-bold text-slate-900">Roadmap Completion</span>
+                               <span className="text-xl font-black text-green-600">{progress}%</span>
+                             </div>
+                             <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                               <div 
+                                 className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-1000"
+                                 style={{ width: `${progress}%` }}
+                               ></div>
+                             </div>
+                             <p className="text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest">
+                               The student's pointer will move to this position
+                             </p>
+                           </div>
+                         );
+                       })()}
+                    </div>
+                  )}
+                </form>
+              </div>
+            )}
+
+            {activeTab === 'chats' && (
+              <div className="bg-white rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col h-[600px] overflow-hidden sticky top-24">
+                {selectedStudentForChat ? (
+                  <>
+                    <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
+                          <Users className="h-6 w-6 text-indigo-100" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-lg leading-tight">{selectedStudentForChat.displayName || selectedStudentForChat.email}</h3>
+                          <p className="text-[10px] text-indigo-100 font-black uppercase tracking-widest">Active Thread</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setSelectedStudentForChat(null)} className="text-indigo-100 hover:text-white transition-colors">
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/30">
+                      {chatMessages
+                        .filter(m => m.studentId === selectedStudentForChat.id)
+                        .map((msg) => (
+                          <div 
+                            key={msg.id} 
+                            className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div className={`max-w-[70%] p-5 rounded-3xl text-sm ${
+                              msg.sender === 'admin' 
+                                ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/10' 
+                                : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none shadow-sm'
+                            }`}>
+                              {msg.text}
+                              <div className={`text-[8px] mt-2 font-black uppercase tracking-widest ${
+                                msg.sender === 'admin' ? 'text-indigo-200' : 'text-slate-400'
+                              }`}>
+                                {msg.createdAt?.toDate ? new Date(msg.createdAt.toDate()).toLocaleString() : 'Just now'}
+                              </div>
+                            </div>
+                          </div>
+                      ))}
+                      {chatMessages.filter(m => m.studentId === selectedStudentForChat.id).length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                          <MessageSquare className="h-12 w-12 text-slate-300 mb-4" />
+                          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Start the conversation</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-slate-100">
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="text"
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          placeholder="Send instructions or feedback..."
+                          className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium"
+                        />
+                        <button
+                          type="submit"
+                          className="bg-indigo-600 text-white p-4 rounded-2xl shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
+                        >
+                          <ChevronRight className="h-6 w-6" />
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center p-12 text-center">
+                    <div className="bg-indigo-50 p-6 rounded-[2.5rem] mb-6">
+                      <MessageSquare className="h-12 w-12 text-indigo-600" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-2">Student Chats</h3>
+                    <p className="text-slate-500 font-medium max-w-sm">
+                      Select a student from the right column to view history and send 2-way messages or announcements.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === 'flashcards' && (
               <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
                 <div className="flex items-center space-x-3 mb-8">
                   <div className="bg-blue-50 p-3 rounded-2xl">
                     <Sparkles className="h-6 w-6 text-blue-600" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">AI Flashcard Generator</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Flashcard Generator</h2>
                 </div>
 
                 <form onSubmit={handleGenerateFlashcardDraft} className="space-y-6">
@@ -1183,16 +1864,64 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
           {/* Content List Column */}
           <div className="lg:col-span-2 space-y-8">
+            {activeTab === 'courses' && (
+              <div className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Available Courses</h2>
+                  <div className="flex space-x-2">
+                    <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                      {courses.length} Active System-wide
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {courses.map((course) => (
+                    <div 
+                      key={course.id} 
+                      className={`bg-white p-8 rounded-[2.5rem] border transition-all ${
+                        activeCourseId === course.id ? 'border-indigo-200 ring-2 ring-indigo-500/10 shadow-xl' : 'border-slate-100 shadow-sm opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="bg-indigo-50 p-3 rounded-2xl">
+                          <Globe className="h-6 w-6 text-indigo-600" />
+                        </div>
+                        <button onClick={() => handleDeleteCourse(course.id)} className="text-slate-300 hover:text-red-600">
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2 truncate">{course.title}</h3>
+                      <p className="text-sm text-slate-500 font-medium line-clamp-2 mb-6">{course.description || "No description provided."}</p>
+                      <button 
+                        onClick={() => setActiveCourseId(course.id)}
+                        className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${
+                          activeCourseId === course.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {activeCourseId === course.id ? 'Currently Editing Content' : 'Select to Manage Content'}
+                      </button>
+                    </div>
+                  ))}
+                  {courses.length === 0 && (
+                    <div className="col-span-full py-20 text-center bg-slate-50 rounded-[3rem] border border-dashed border-slate-200">
+                      <Globe className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                      <p className="text-slate-400 font-medium italic">No courses found. Create your first course on the left.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {activeTab === 'quizzes' && (
               <>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Manage Quizzes & Assignments</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Course Quizzes</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {quizzes.length} Total
+                    {quizzes.filter(q => q.courseId === activeCourseId).length} Total
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-8">
-                  {quizzes.length > 0 ? quizzes.map((quiz) => (
+                  {quizzes.filter(q => q.courseId === activeCourseId).length > 0 ? quizzes.filter(q => q.courseId === activeCourseId).map((quiz) => (
                     <div
                       key={quiz.id}
                       className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
@@ -1287,16 +2016,241 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </>
             )}
 
+            {activeTab === 'exercises' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Exercise Library</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {exercises.length} Total
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {exercises.map((exercise) => (
+                    <div key={exercise.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden group">
+                      <div className="aspect-video relative bg-slate-100">
+                        <img 
+                          src={`https://img.youtube.com/vi/${exercise.videoUrl.split('v=')[1]?.split('&')[0] || exercise.videoUrl.split('/').pop()}/maxresdefault.jpg`} 
+                          alt="" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80'; }}
+                        />
+                        <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <PlayCircle className="h-12 w-12 text-white" />
+                        </div>
+                        <div className="absolute top-4 left-4">
+                          <span className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
+                            {exercise.category}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <h3 className="font-bold text-slate-900 leading-tight">{exercise.name}</h3>
+                          <button onClick={() => handleDeleteExercise(exercise.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                        <p className="text-sm text-slate-500 line-clamp-2 mb-4">{exercise.description}</p>
+                        <a 
+                          href={exercise.videoUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 text-[10px] font-black uppercase tracking-widest flex items-center hover:underline"
+                        >
+                          <Globe className="h-3 w-3 mr-1" /> View on YouTube
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {activeTab === 'knowledge' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Shared Knowledge Hub</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {knowledgeVideos.length} Total
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-6">
+                  {knowledgeVideos.map((video) => (
+                    <div key={video.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center space-x-6">
+                      <div className="w-48 aspect-video rounded-2xl overflow-hidden flex-shrink-0 relative">
+                        <img 
+                          src={`https://img.youtube.com/vi/${video.videoUrl.split('v=')[1]?.split('&')[0] || video.videoUrl.split('/').pop()}/mqdefault.jpg`} 
+                          className="w-full h-full object-cover" 
+                          alt="" 
+                        />
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                          <PlayCircle className="h-8 w-8 text-white opacity-80" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${
+                            video.category === 'Nutrition' ? 'bg-green-50 text-green-600' :
+                            video.category === 'Fitness' ? 'bg-blue-50 text-blue-600' :
+                            video.category === 'Health' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
+                          }`}>
+                            {video.category}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900 mb-2">{video.title}</h3>
+                        <p className="text-sm text-slate-500 line-clamp-1 mb-4">{video.description}</p>
+                        <div className="flex items-center justify-between">
+                          <a href={video.videoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs font-bold hover:underline">Watch Tutorial</a>
+                          <button onClick={() => handleDeleteKnowledgeVideo(video.id)} className="text-slate-300 hover:text-red-500">
+                             <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {activeTab === 'announcements' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Announcements</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {announcements.length} Total
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {announcements.map((item) => (
+                    <div key={item.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className={`p-3 rounded-2xl ${
+                            item.type === 'urgent' ? 'bg-red-50 text-red-600' :
+                            item.type === 'task' ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-600'
+                          }`}>
+                            <Megaphone className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-900">{item.title}</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{new Date(item.createdAt?.toDate()).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <button onClick={() => handleDeleteAnnouncement(item.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <div className="mt-4 text-slate-600 text-sm whitespace-pre-wrap">
+                        {item.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {activeTab === 'results' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Certification Result Sheet</h2>
+                  <div className="flex space-x-2">
+                     <span className="text-xs font-bold text-green-600 bg-green-50 px-4 py-1.5 rounded-full uppercase tracking-widest">
+                       {allScores.length} Records
+                     </span>
+                  </div>
+                </div>
+                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+                   <table className="w-full text-left border-collapse">
+                     <thead>
+                       <tr className="bg-slate-50">
+                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Student</th>
+                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Chapter</th>
+                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Score</th>
+                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Date</th>
+                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                       </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-50">
+                        {allScores.map((score) => (
+                          <tr key={score.id} className="hover:bg-slate-50/50 transition-colors group">
+                            <td className="px-8 py-5">
+                              <div className="font-bold text-slate-900">{score.studentEmail}</div>
+                              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{score.quizTitle}</div>
+                            </td>
+                            <td className="px-8 py-5">
+                              <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg font-black text-xs">CH {score.chapter}</span>
+                            </td>
+                            <td className="px-8 py-5">
+                              <div className="flex items-center space-x-2">
+                                <div className={`w-2 h-2 rounded-full ${(score.score/score.totalQuestions) >= 0.8 ? 'bg-green-500' : 'bg-orange-500'}`}></div>
+                                <span className="font-black text-slate-900">{score.score}/{score.totalQuestions}</span>
+                                <span className="text-[10px] font-bold text-slate-400">({Math.round(score.score/score.totalQuestions*100)}%)</span>
+                              </div>
+                            </td>
+                            <td className="px-8 py-5 text-xs font-bold text-slate-400">
+                              {score.completedAt?.toDate ? new Date(score.completedAt.toDate()).toLocaleDateString() : 'N/A'}
+                            </td>
+                            <td className="px-8 py-5 text-right">
+                              <button 
+                                onClick={() => deleteDoc(doc(db, 'scores', score.id))}
+                                className="p-2 text-slate-300 hover:text-red-600 transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                     </tbody>
+                   </table>
+                   {allScores.length === 0 && (
+                     <div className="py-20 text-center">
+                        <Trophy className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                        <p className="text-slate-400 font-medium italic">No results recorded yet. Start by entering marks on the left.</p>
+                     </div>
+                   )}
+                </div>
+              </>
+            )}
+
+            {activeTab === 'chats' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Student Chats</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {students.map((st) => (
+                    <button
+                      key={st.id}
+                      onClick={() => setSelectedStudentForChat(st)}
+                      className={`p-6 rounded-3xl border transition-all text-left flex items-center space-x-4 ${
+                        selectedStudentForChat?.id === st.id ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100'
+                      }`}
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center">
+                        <Users className="h-6 w-6 text-indigo-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold truncate">{st.displayName || st.email}</div>
+                        <div className={`text-xs truncate ${selectedStudentForChat?.id === st.id ? 'text-indigo-100' : 'text-slate-400'}`}>
+                          {st.email}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
             {activeTab === 'materials' && (
               <>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Manage Study Materials</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Course Materials</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {materials.length} Total
+                    {materials.filter(m => m.courseId === activeCourseId).length} Units
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-8">
-                  {materials.length > 0 ? materials.map((material) => (
+                  {materials.filter(m => m.courseId === activeCourseId).length > 0 ? materials.filter(m => m.courseId === activeCourseId).map((material) => (
                     <div
                       key={material.id}
                       className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
@@ -1368,13 +2322,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             {activeTab === 'liveClasses' && (
               <>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Manage Live Classes</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Live Schedule</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {liveClasses.length} Total
+                    {liveClasses.filter(c => c.courseId === activeCourseId).length} Units
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-8">
-                  {liveClasses.length > 0 ? liveClasses.map((liveClass) => (
+                  {liveClasses.filter(c => c.courseId === activeCourseId).length > 0 ? liveClasses.filter(c => c.courseId === activeCourseId).map((liveClass) => (
                     <div
                       key={liveClass.id}
                       className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
@@ -1453,13 +2407,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             {activeTab === 'flashcards' && (
               <>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Manage Flashcard Sets</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Active Course Flashcards</h2>
                   <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                    {flashcardSets.length} Total
+                    {flashcardSets.filter(s => s.courseId === activeCourseId).length} Sets
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-8">
-                  {flashcardSets.length > 0 ? flashcardSets.map((set) => (
+                  {flashcardSets.filter(s => s.courseId === activeCourseId).length > 0 ? flashcardSets.filter(s => s.courseId === activeCourseId).map((set) => (
                     <div
                       key={set.id}
                       className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"

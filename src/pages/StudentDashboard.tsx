@@ -3,19 +3,31 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, getDocs, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X } from 'lucide-react';
+import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X, Megaphone, CheckCircle2, Activity, Lightbulb, MessageSquare, BookCheck, Sparkles, LogOut, ArrowRight, User } from 'lucide-react';
 
 interface StudentDashboardProps {
   user: any;
 }
 
 export default function StudentDashboard({ user }: StudentDashboardProps) {
+  const [courses, setCourses] = React.useState<any[]>([]);
+  const [activeCourseId, setActiveCourseId] = React.useState<string | null>(null);
   const [quizzes, setQuizzes] = React.useState<any[]>([]);
   const [materials, setMaterials] = React.useState<any[]>([]);
   const [liveClasses, setLiveClasses] = React.useState<any[]>([]);
   const [flashcardSets, setFlashcardSets] = React.useState<any[]>([]);
+  const [exercises, setExercises] = React.useState<any[]>([]);
+  const [knowledgeVideos, setKnowledgeVideos] = React.useState<any[]>([]);
+  const [announcements, setAnnouncements] = React.useState<any[]>([]);
+  const [chatMessages, setChatMessages] = React.useState<any[]>([]);
+  const [newMessage, setNewMessage] = React.useState('');
   const [scores, setScores] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [isChatOpen, setIsChatOpen] = React.useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = React.useState(false);
+  const [feedbackRating, setFeedbackRating] = React.useState(5);
+  const [feedbackText, setFeedbackText] = React.useState('');
+  const [feedbackCategory, setFeedbackCategory] = React.useState<'understanding' | 'teaching'>('understanding');
   const [showGuide, setShowGuide] = React.useState(() => {
     // Check if user has seen the guide before
     const seen = localStorage.getItem(`guide_seen_${user.uid}`);
@@ -29,6 +41,40 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
 
   React.useEffect(() => {
     if (!user?.uid) return;
+
+    // Fetch all available courses
+    const unsubscribeCourses = onSnapshot(collection(db, 'courses'), (snapshot) => {
+      const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCourses(fetchedCourses);
+      if (fetchedCourses.length > 0 && !activeCourseId) {
+        setActiveCourseId(fetchedCourses[0].id);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'courses'));
+
+    // Check for feedback trigger (all materials + quiz for a chapter done)
+    const checkFeedbackStatus = async () => {
+      if (!activeCourseId || !user?.uid) return;
+      
+      // Basic logic: if student has a score for a chapter and has viewed materials
+      // For now, we'll check if they completed a quiz in the active course
+      const lastQuizScore = scores.find(s => s.courseId === activeCourseId);
+      if (lastQuizScore) {
+        // Only show if not already submitted for this course/chapter
+        const feedbackQuery = query(
+          collection(db, 'feedbacks'),
+          where('studentId', '==', user.uid),
+          where('courseId', '==', activeCourseId)
+        );
+        const feedbackSnap = await getDocs(feedbackQuery);
+        if (feedbackSnap.empty) {
+          setShowFeedbackModal(true);
+        }
+      }
+    };
+
+    if (scores.length > 0) {
+      checkFeedbackStatus();
+    }
 
     // Only show published quizzes assigned to this student
     const quizzesQuery = query(
@@ -68,6 +114,34 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       setFlashcardSets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'flashcards'));
 
+    // Fetch Exercises
+    const exercisesQuery = query(collection(db, 'exercises'), orderBy('createdAt', 'desc'));
+    const unsubscribeExercises = onSnapshot(exercisesQuery, (snapshot) => {
+      setExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'exercises'));
+
+    // Fetch Knowledge Videos
+    const knowledgeQuery = query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc'));
+    const unsubscribeKnowledge = onSnapshot(knowledgeQuery, (snapshot) => {
+      setKnowledgeVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'knowledgeVideos'));
+
+    // Fetch Announcements
+    const announcementsQuery = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
+    const unsubscribeAnnouncements = onSnapshot(announcementsQuery, (snapshot) => {
+      setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
+
+    // Fetch Chat Messages
+    const chatQuery = query(
+      collection(db, 'chatMessages'),
+      where('studentId', '==', user.uid),
+      orderBy('createdAt', 'asc')
+    );
+    const unsubscribeChat = onSnapshot(chatQuery, (snapshot) => {
+      setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'chatMessages'));
+
     const scoresQuery = query(
       collection(db, 'scores'), 
       where('studentId', '==', user.uid),
@@ -79,13 +153,59 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'scores'));
 
     return () => {
+      unsubscribeCourses();
       unsubscribeQuizzes();
       unsubscribeMaterials();
       unsubscribeLiveClasses();
       unsubscribeFlashcards();
+      unsubscribeExercises();
+      unsubscribeKnowledge();
+      unsubscribeAnnouncements();
+      unsubscribeChat();
       unsubscribeScores();
     };
-  }, [user.uid]);
+  }, [user.uid, activeCourseId, scores.length]);
+
+  const handleSendFeedback = async () => {
+    if (!user?.uid || !activeCourseId) return;
+
+    try {
+      const { addDoc, serverTimestamp } = await import('firebase/firestore');
+      await addDoc(collection(db, 'feedbacks'), {
+        studentId: user.uid,
+        studentName: user.displayName || user.email,
+        courseId: activeCourseId,
+        courseTitle: courses.find(c => c.id === activeCourseId)?.title || 'Unknown Course',
+        rating: feedbackRating,
+        comment: feedbackText,
+        category: feedbackCategory,
+        createdAt: serverTimestamp()
+      });
+      setShowFeedbackModal(false);
+      setFeedbackText('');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'feedbacks');
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !user?.uid) return;
+
+    try {
+      const { addDoc, serverTimestamp } = await import('firebase/firestore');
+      await addDoc(collection(db, 'chatMessages'), {
+        studentId: user.uid,
+        studentEmail: user.email,
+        text: newMessage,
+        sender: 'student',
+        createdAt: serverTimestamp()
+      });
+      setNewMessage('');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'chatMessages');
+    }
+  };
 
   if (loading) {
     return (
@@ -101,6 +221,11 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     const averageScore = scores.length > 0 
     ? Math.round(scores.reduce((acc, s) => acc + (s.score / s.totalQuestions), 0) / scores.length * 100)
     : 0;
+
+  // Assuming 20 chapters for ACE-CPT for the roadmap
+  const TOTAL_CHAPTERS = 20;
+  const completedChapters = Array.from(new Set(scores.map(s => s.chapter))).filter(Boolean).length;
+  const progressPercentage = Math.min(Math.round((completedChapters / TOTAL_CHAPTERS) * 100), 100);
 
   return (
     <motion.div 
@@ -168,6 +293,141 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
         )}
       </AnimatePresence>
 
+      {/* Course Context Picker */}
+      <div className="flex items-center justify-between mb-8 overflow-x-auto pb-4 scrollbar-hide">
+        <div className="flex space-x-2">
+          {courses.map((course) => (
+            <button
+              key={course.id}
+              onClick={() => setActiveCourseId(course.id)}
+              className={`px-6 py-3 rounded-2xl whitespace-nowrap font-bold text-sm transition-all flex items-center space-x-2 ${
+                activeCourseId === course.id 
+                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/20' 
+                  : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'
+              }`}
+            >
+              <GraduationCap className="h-4 w-4" />
+              <span>{course.title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Announcements */}
+      {announcements.length > 0 && (
+        <div className="mb-12 space-y-4">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="bg-red-50 p-2 rounded-lg">
+              <Megaphone className="h-5 w-5 text-red-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Announcements & Tasks</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            {announcements.map((ann) => (
+              <motion.div
+                key={ann.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className={`p-6 rounded-3xl border-l-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 ${
+                  ann.type === 'urgent' ? 'bg-red-50 border-red-500' : 
+                  ann.type === 'task' ? 'bg-blue-50 border-blue-500' : 'bg-white border-slate-200'
+                }`}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <h3 className="font-bold text-slate-900">{ann.title}</h3>
+                    <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                      ann.type === 'urgent' ? 'bg-red-600 text-white animate-pulse' :
+                      ann.type === 'task' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {ann.type}
+                    </span>
+                  </div>
+                  <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{ann.content}</p>
+                </div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                  {new Date(ann.createdAt?.toDate()).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Certification Roadmap: Success Pointer */}
+      <div className="mb-12">
+        <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-slate-100 shadow-xl shadow-slate-200/50">
+          <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Certification Roadmap</h2>
+              <p className="text-slate-500 font-medium italic text-sm">Your visual journey through the ACE-CPT curriculum</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Chapters Completed</div>
+                <div className="text-2xl font-black text-blue-600">{completedChapters} / {TOTAL_CHAPTERS}</div>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-3xl">
+                <Award className="h-8 w-8 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Roadmap Track */}
+          <div className="relative pt-12 pb-8 px-4 md:px-12">
+            <div className="h-4 w-full bg-slate-100 rounded-full relative overflow-hidden shadow-inner">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${progressPercentage}%` }}
+                className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+              />
+            </div>
+
+            {/* Scale Markers */}
+            <div className="absolute top-12 left-0 w-full h-4 flex justify-between px-4 md:px-12 pointer-events-none">
+              {[0, 25, 50, 75, 100].map((marker) => (
+                <div key={marker} className="flex flex-col items-center">
+                  <div className="h-4 w-1 bg-white/50 backdrop-blur rounded-full"></div>
+                  <div className="mt-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">{marker}%</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Moving Pointer */}
+            <motion.div
+              initial={{ left: '0%' }}
+              animate={{ left: `${progressPercentage}%` }}
+              className="absolute top-3 -translate-x-1/2 z-20 flex flex-col items-center group cursor-default"
+            >
+              <div className="bg-white p-3 rounded-[1.25rem] shadow-2xl border border-blue-100 flex items-center justify-center -translate-y-4 group-hover:-translate-y-6 transition-transform duration-300">
+                <GraduationCap className="h-6 w-6 text-blue-600" />
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r border-b border-blue-100 rotate-45"></div>
+              </div>
+              <div className="mt-14 bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-lg shadow-blue-500/30">
+                You are here
+              </div>
+            </motion.div>
+
+            {/* Milestones */}
+            <div className="grid grid-cols-4 gap-4 mt-16 pt-8 border-t border-slate-50">
+               {[
+                 { p: 25, label: "Foundation", icon: <Star className="h-4 w-4" /> },
+                 { p: 50, label: "Intermediate", icon: <CheckCircle2 className="h-4 w-4" /> },
+                 { p: 75, label: "Advanced", icon: <Trophy className="h-4 w-4" /> },
+                 { p: 100, label: "Certified", icon: <Award className="h-4 w-4" /> }
+               ].map((m, i) => (
+                 <div key={i} className={`flex flex-col items-center ${progressPercentage >= m.p ? 'text-blue-600' : 'text-slate-300'}`}>
+                   <div className={`p-2 rounded-xl mb-2 transition-colors ${progressPercentage >= m.p ? 'bg-blue-50' : 'bg-slate-50'}`}>
+                     {m.icon}
+                   </div>
+                   <span className="text-[10px] font-black uppercase tracking-widest">{m.label}</span>
+                 </div>
+               ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Welcome & Progress Header */}
       <div className="mb-12">
         <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-slate-100 shadow-sm relative overflow-hidden">
@@ -221,12 +481,12 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Signature Academy Quizzes</h2>
             <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
-              {quizzes.length} Available
+              {quizzes.filter(q => q.courseId === activeCourseId).length} Available
             </span>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {quizzes.length > 0 ? quizzes.map((quiz, idx) => {
+            {quizzes.filter(q => q.courseId === activeCourseId).length > 0 ? quizzes.filter(q => q.courseId === activeCourseId).map((quiz, idx) => {
               const isGoogleForm = quiz.type === 'google_form';
               const CardContent = (
                 <motion.div 
@@ -290,14 +550,14 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
 
           <div className="pt-8">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-slate-900 tracking-tight">AI Generated Flashcards</h2>
+              <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Flashcards</h2>
               <span className="text-sm font-bold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
-                {flashcardSets.length} Sets
+                {flashcardSets.filter(s => s.courseId === activeCourseId).length} Sets
               </span>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {flashcardSets.length > 0 ? flashcardSets.map((set, idx) => (
+              {flashcardSets.filter(s => s.courseId === activeCourseId).length > 0 ? flashcardSets.filter(s => s.courseId === activeCourseId).map((set, idx) => (
                 <Link key={set.id} to={`/flashcards/${set.id}`} className="block">
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
@@ -342,6 +602,82 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
 
         {/* Sidebar: Study Materials & Recent Activity */}
         <div className="space-y-10">
+          {/* Exercise Library */}
+          <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center tracking-tight">
+                <Activity className="h-6 w-6 mr-3 text-blue-600" />
+                Exercise Library
+              </h2>
+              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">
+                {exercises.length} Videos
+              </span>
+            </div>
+            <div className="overflow-y-auto max-h-[600px] pr-2 space-y-6">
+              {exercises.map((ex) => (
+                <div key={ex.id} className="group cursor-pointer">
+                  <div className="aspect-video relative rounded-2xl overflow-hidden mb-3">
+                    <img 
+                      src={`https://img.youtube.com/vi/${ex.videoUrl.split('v=')[1]?.split('&')[0] || ex.videoUrl.split('/').pop()}/mqdefault.jpg`} 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      alt={ex.name}
+                    />
+                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/40 transition-all">
+                      <PlayCircle className="h-10 w-10 text-white shadow-xl" />
+                    </div>
+                    <div className="absolute top-2 left-2">
+                      <span className="bg-blue-600/90 text-white text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded backdrop-blur">
+                        {ex.category}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors">{ex.name}</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Biomechanics Tutorial</p>
+                </div>
+              ))}
+              {exercises.length > 3 && (
+                 <button className="w-full py-4 rounded-2xl border-2 border-dashed border-slate-100 text-xs font-black text-slate-400 uppercase tracking-widest hover:border-blue-200 hover:text-blue-600 transition-all">
+                   View Entire Library
+                 </button>
+              )}
+              {exercises.length === 0 && (
+                <p className="text-slate-400 text-sm italic text-center py-4">Tutorials coming soon.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Knowledge Sharing Hub */}
+          <div className="bg-slate-50 rounded-[3rem] p-8 border border-slate-100 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900 mb-8 flex items-center tracking-tight">
+              <Lightbulb className="h-6 w-6 mr-3 text-amber-600" />
+              Knowledge Hub
+            </h2>
+            <div className="space-y-4">
+              {knowledgeVideos.map((video) => (
+                <a 
+                  key={video.id}
+                  href={video.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center space-x-4 p-4 rounded-2xl bg-white border border-slate-100 hover:border-amber-200 transition-all group"
+                >
+                  <div className="bg-amber-50 p-2.5 rounded-xl text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-all overflow-hidden relative">
+                    <PlayCircle className="h-5 w-5 relative z-10" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-slate-900 truncate group-hover:text-amber-600 transition-colors">{video.title}</div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                      {video.category} • {new Date(video.createdAt?.toDate()).toLocaleDateString()}
+                    </div>
+                  </div>
+                </a>
+              ))}
+              {knowledgeVideos.length === 0 && (
+                <p className="text-slate-400 text-sm italic text-center py-4">No videos shared yet.</p>
+              )}
+            </div>
+          </div>
+
           {/* Live Classes */}
           {liveClasses.length > 0 && (
             <div className="bg-red-600 rounded-[3rem] p-8 text-white shadow-2xl shadow-red-900/20 relative overflow-hidden">
@@ -351,7 +687,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 Live Classes
               </h2>
               <div className="space-y-4">
-                {liveClasses.map((item) => (
+                {liveClasses.filter(c => c.courseId === activeCourseId).map((item) => (
                   <div key={item.id} className="space-y-2">
                     <a 
                       href={item.link} 
@@ -407,7 +743,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               Study Materials
             </h2>
             <div className="space-y-4">
-              {materials.length > 0 ? materials.map((item) => (
+              {materials.filter(m => m.courseId === activeCourseId).length > 0 ? materials.filter(m => m.courseId === activeCourseId).map((item) => (
                 <div 
                   key={item.id} 
                   onClick={() => {
@@ -545,23 +881,189 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
         </div>
       </div>
 
-      {/* Floating Help Button for Mobile & Desktop */}
-      <motion.div 
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 1, type: 'spring' }}
-        className="fixed bottom-8 right-8 z-40"
-      >
-        <a 
-          href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex items-center space-x-3 bg-green-600 text-white px-6 py-4 rounded-full shadow-2xl shadow-green-600/40 hover:bg-green-700 transition-all hover:scale-105 group"
-        >
-          <Phone className="h-5 w-5" />
-          <span className="font-bold text-sm hidden md:block">Need Help?</span>
-        </a>
-      </motion.div>
+      {/* Feedback Modal */}
+      <AnimatePresence>
+        {showFeedbackModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-[3rem] p-8 md:p-12 max-w-2xl w-full shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -z-0"></div>
+              
+              <div className="relative z-10 text-center mb-8">
+                <div className="bg-blue-100 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Megaphone className="h-8 w-8 text-blue-600" />
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">We Value Your Voice!</h2>
+                <p className="text-slate-500 font-medium">How was your learning experience with this chapter?</p>
+              </div>
+
+              <div className="space-y-8 relative z-10">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Your Rating</label>
+                  <div className="flex justify-center space-x-3">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setFeedbackRating(star)}
+                        className={`p-3 rounded-2xl transition-all ${feedbackRating >= star ? 'text-yellow-400 bg-yellow-50 scale-110' : 'text-slate-200 bg-slate-50'}`}
+                      >
+                        <Star className={`h-8 w-8 ${feedbackRating >= star ? 'fill-yellow-400' : ''}`} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setFeedbackCategory('understanding')}
+                    className={`py-4 rounded-2xl font-bold text-sm transition-all border ${feedbackCategory === 'understanding' ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 border-slate-100 text-slate-500'}`}
+                  >
+                    Course Clarity
+                  </button>
+                  <button
+                    onClick={() => setFeedbackCategory('teaching')}
+                    className={`py-4 rounded-2xl font-bold text-sm transition-all border ${feedbackCategory === 'teaching' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-50 border-slate-100 text-slate-500'}`}
+                  >
+                    Teaching Quality
+                  </button>
+                </div>
+
+                <div>
+                  <textarea
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    placeholder="Tell us more about your experience..."
+                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium h-32 resize-none"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <button
+                    onClick={() => setShowFeedbackModal(false)}
+                    className="flex-1 py-4 px-6 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all"
+                  >
+                    Maybe Later
+                  </button>
+                  <button
+                    onClick={handleSendFeedback}
+                    className="flex-[2] py-4 px-6 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"
+                  >
+                    Submit Feedback
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Help & Chat Button */}
+      <div className="fixed bottom-8 right-8 z-40 flex flex-col items-end space-y-4">
+        <AnimatePresence>
+          {isChatOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.9, transformOrigin: 'bottom right' }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              className="bg-white w-[350px] sm:w-[400px] h-[500px] rounded-[2.5rem] shadow-2xl shadow-indigo-500/20 border border-slate-100 flex flex-col overflow-hidden mb-4"
+            >
+              {/* Chat Header */}
+              <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-white/20 p-2 rounded-xl">
+                    <MessageSquare className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold">Academy Support</div>
+                    <div className="text-[10px] text-indigo-100 font-bold uppercase tracking-widest flex items-center">
+                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-2 animate-pulse"></div>
+                      Admin Online
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setIsChatOpen(false)} className="hover:rotate-90 transition-transform">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Messages Area */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
+                {chatMessages.length > 0 ? chatMessages.map((msg) => (
+                  <div 
+                    key={msg.id} 
+                    className={`flex ${msg.sender === 'student' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
+                      msg.sender === 'student' 
+                        ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/10' 
+                        : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none shadow-sm'
+                    }`}>
+                      {msg.text}
+                      <div className={`text-[8px] mt-1 font-bold uppercase tracking-widest ${
+                        msg.sender === 'student' ? 'text-indigo-200' : 'text-slate-400'
+                      }`}>
+                        {msg.createdAt?.toDate ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending...'}
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                    <div className="bg-white p-4 rounded-2xl shadow-sm mb-4">
+                      <MessageSquare className="h-8 w-8 text-indigo-200" />
+                    </div>
+                    <p className="text-sm text-slate-400 font-medium">Hello! Ask us anything about your course or tasks.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Input Area */}
+              <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100">
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <button 
+                    type="submit"
+                    className="bg-indigo-600 text-white p-3 rounded-xl shadow-lg shadow-indigo-500/20 hover:scale-105 transition-transform"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex space-x-3">
+          <a 
+            href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center space-x-3 bg-green-600 text-white px-6 py-4 rounded-full shadow-2xl shadow-green-600/40 hover:bg-green-700 transition-all hover:scale-105 group"
+          >
+            <Phone className="h-5 w-5" />
+            <span className="font-bold text-sm hidden md:block">Need Help?</span>
+          </a>
+          
+          <button 
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className="bg-indigo-600 text-white p-4 rounded-full shadow-2xl shadow-indigo-600/40 hover:bg-indigo-700 transition-all hover:scale-105 relative"
+          >
+            <MessageSquare className="h-6 w-6" />
+            {!isChatOpen && chatMessages.some(m => m.sender === 'admin' && !m.read) && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full"></div>
+            )}
+          </button>
+        </div>
+      </div>
     </motion.div>
   );
 }
