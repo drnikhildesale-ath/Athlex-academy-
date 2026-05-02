@@ -67,14 +67,22 @@ export const Chatbot: React.FC = () => {
             className="mb-4 w-80 sm:w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-100"
           >
             {/* Header */}
-            <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Bot size={20} />
-                <span className="font-semibold">Athlex Assistant</span>
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 text-white flex justify-between items-center shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
+                  <Bot size={22} className="text-white" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm tracking-tight">Athlex AI Expert</div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-blue-100">Online & Ready</div>
+                  </div>
+                </div>
               </div>
               <button 
                 onClick={() => setIsOpen(false)}
-                className="hover:bg-blue-700 p-1 rounded-full transition-colors"
+                className="hover:bg-white/10 p-2 rounded-full transition-all"
               >
                 <X size={20} />
               </button>
@@ -88,13 +96,13 @@ export const Chatbot: React.FC = () => {
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <div className={`mt-1 p-1 rounded-full ${msg.role === 'user' ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-600'}`}>
-                      {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
+                    <div className={`mt-1 p-1.5 rounded-xl shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-blue-600 border border-blue-50'}`}>
+                      {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
                     </div>
-                    <div className={`p-3 rounded-2xl text-sm ${
+                    <div className={`p-4 rounded-2xl text-sm leading-relaxed ${
                       msg.role === 'user' 
-                        ? 'bg-blue-600 text-white rounded-tr-none shadow-md shadow-blue-200' 
-                        : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-tl-none'
+                        ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-100' 
+                        : 'bg-white text-slate-800 shadow-sm border border-slate-100 rounded-tl-none'
                     }`}>
                       <div className={`prose prose-sm max-w-none prose-p:leading-relaxed ${
                         msg.role === 'user' ? 'prose-invert' : ''

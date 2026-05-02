@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ } from '../services/gemini';
@@ -46,6 +47,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [driveUrl, setDriveUrl] = React.useState('');
   const [liveClassTitle, setLiveClassTitle] = React.useState('');
   const [liveClassLink, setLiveClassLink] = React.useState('');
+  const [liveClassRecordingLink, setLiveClassRecordingLink] = React.useState('');
   const [liveClassDate, setLiveClassDate] = React.useState('');
   
   // Success Story Form
@@ -258,6 +260,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       await addDoc(collection(db, 'liveClasses'), {
         title: liveClassTitle,
         link: liveClassLink,
+        recordingLink: liveClassRecordingLink || null,
         scheduledAt: liveClassDate ? new Date(liveClassDate) : serverTimestamp(),
         assignedTo: [],
         createdAt: serverTimestamp(),
@@ -265,6 +268,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       });
       setLiveClassTitle('');
       setLiveClassLink('');
+      setLiveClassRecordingLink('');
       setLiveClassDate('');
       setStatus({ type: 'success', message: "Live class link added successfully!" });
     } catch (err) {
@@ -363,10 +367,14 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-12">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-12"
+      >
         <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Admin Command Center</h1>
         <p className="text-slate-500 font-medium">Manage signature academy quizzes and content for your students.</p>
-      </div>
+      </motion.div>
 
       {/* Tab Navigation */}
       <div className="flex space-x-4 mb-12 bg-slate-100 p-2 rounded-2xl w-fit">
@@ -760,6 +768,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                       placeholder="https://zoom.us/j/..."
                       className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
                       required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Recording Link (Optional)</label>
+                    <input
+                      type="url"
+                      value={liveClassRecordingLink}
+                      onChange={(e) => setLiveClassRecordingLink(e.target.value)}
+                      placeholder="https://drive.google.com/..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
                     />
                   </div>
 
@@ -1167,8 +1186,15 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           </div>
                           <div>
                             <h3 className="text-xl font-bold text-slate-900 mb-1">{liveClass.title}</h3>
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                              {liveClass.scheduledAt ? new Date(liveClass.scheduledAt.toDate()).toLocaleString() : 'Not scheduled'}
+                            <div className="flex flex-col space-y-1">
+                              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                {liveClass.scheduledAt ? new Date(liveClass.scheduledAt.toDate()).toLocaleString() : 'Not scheduled'}
+                              </div>
+                              {liveClass.recordingLink && (
+                                <div className="flex items-center text-xs font-bold text-red-600 uppercase tracking-widest">
+                                  <PlayCircle className="h-3 w-3 mr-1" /> Recording Available
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

@@ -84,6 +84,7 @@
         "title": { "type": "string" },
         "description": { "type": "string" },
         "link": { "type": "string", "format": "uri" },
+        "recordingLink": { "type": "string", "format": "uri" },
         "scheduledAt": { "type": "string", "format": "date-time" },
         "assignedTo": { "type": "array", "items": { "type": "string" }, "description": "List of student UIDs assigned to this class." },
         "createdAt": { "type": "string", "format": "date-time" },

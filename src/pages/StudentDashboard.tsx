@@ -1,8 +1,9 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, getDocs, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award } from 'lucide-react';
+import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X } from 'lucide-react';
 
 interface StudentDashboardProps {
   user: any;
@@ -14,6 +15,16 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
   const [liveClasses, setLiveClasses] = React.useState<any[]>([]);
   const [scores, setScores] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [showGuide, setShowGuide] = React.useState(() => {
+    // Check if user has seen the guide before
+    const seen = localStorage.getItem(`guide_seen_${user.uid}`);
+    return !seen;
+  });
+
+  const dismissGuide = () => {
+    localStorage.setItem(`guide_seen_${user.uid}`, 'true');
+    setShowGuide(false);
+  };
 
   React.useEffect(() => {
     if (!user?.uid) return;
@@ -76,12 +87,76 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     );
   }
 
-  const averageScore = scores.length > 0 
+    const averageScore = scores.length > 0 
     ? Math.round(scores.reduce((acc, s) => acc + (s.score / s.totalQuestions), 0) / scores.length * 100)
     : 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 relative"
+    >
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+            className="mb-12"
+          >
+            <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 rounded-[3rem] p-8 md:p-12 text-white relative shadow-2xl shadow-blue-500/30 overflow-hidden group">
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:scale-110 transition-transform duration-700"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
+              
+              <button 
+                onClick={dismissGuide}
+                className="absolute top-8 right-8 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all hover:rotate-90 z-20"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <div className="relative z-10 flex flex-col lg:flex-row items-center gap-12">
+                <div className="w-24 h-24 md:w-32 md:h-32 bg-white/10 rounded-[2.5rem] border border-white/20 backdrop-blur-xl flex items-center justify-center flex-shrink-0 animate-bounce-slow">
+                  <GraduationCap className="h-12 w-12 md:h-16 md:w-16 text-white" />
+                </div>
+                
+                <div className="flex-1 text-center lg:text-left">
+                  <h2 className="text-3xl md:text-4xl font-black mb-4 tracking-tight leading-tight">
+                    Welcome to your <span className="text-blue-200">Signature Academy.</span>
+                  </h2>
+                  <p className="text-lg md:text-xl text-blue-100 font-medium mb-10 max-w-2xl">
+                    Everything you need to master your ACE-CPT certification is right here. Let's explore your dashboard.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[
+                      { icon: <Dumbbell className="h-5 w-5" />, title: "Quizzes", desc: "Signature chapter-wise tests" },
+                      { icon: <BookOpen className="h-5 w-5" />, title: "Materials", desc: "PDFs & Cloud Resources" },
+                      { icon: <Video className="h-5 w-5" />, title: "Live Classes", desc: "Interact with mentors live" },
+                      { icon: <Phone className="h-5 w-5" />, title: "Community", desc: "24/7 WhatsApp Support" }
+                    ].map((step, i) => (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 + (i * 0.1) }}
+                        key={i} 
+                        className="bg-white/10 p-5 rounded-2xl border border-white/10 backdrop-blur-sm hover:bg-white/20 transition-colors"
+                      >
+                        <div className="text-blue-200 mb-3">{step.icon}</div>
+                        <div className="text-white font-bold text-sm mb-1">{step.title}</div>
+                        <div className="text-blue-100/70 text-xs">{step.desc}</div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Welcome & Progress Header */}
       <div className="mb-12">
         <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-slate-100 shadow-sm relative overflow-hidden">
@@ -127,23 +202,32 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* Quizzes Grid */}
-        <div className="lg:col-span-2 space-y-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="lg:col-span-2 space-y-8"
+        >
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Signature Academy Quizzes</h2>
-            <span className="text-sm font-bold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
+            <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
               {quizzes.length} Available
             </span>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {quizzes.length > 0 ? quizzes.map((quiz) => {
+            {quizzes.length > 0 ? quizzes.map((quiz, idx) => {
               const isGoogleForm = quiz.type === 'google_form';
               const CardContent = (
-                <div className="group bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 hover:-translate-y-1 transition-all relative overflow-hidden h-full">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-[3rem] -z-0 opacity-50 group-hover:scale-110 transition-transform"></div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="group bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 transition-all relative overflow-hidden h-full"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-[3rem] -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
                   
                   <div className="relative z-10">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isGoogleForm ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 group-hover:rotate-6 ${isGoogleForm ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
                       {isGoogleForm ? <Globe className="h-7 w-7" /> : <Dumbbell className="h-7 w-7" />}
                     </div>
                     <div className="flex items-center space-x-2 mb-2">
@@ -170,7 +254,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                       </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               );
 
               return isGoogleForm ? (
@@ -192,7 +276,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Sidebar: Study Materials & Recent Activity */}
         <div className="space-y-10">
@@ -206,26 +290,48 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               </h2>
               <div className="space-y-4">
                 {liveClasses.map((item) => (
-                  <a 
-                    key={item.id} 
-                    href={item.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-4 bg-white/10 rounded-2xl border border-white/10 hover:bg-white/20 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-white/10 p-2.5 rounded-xl text-white">
-                        <PlayCircle className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold">{item.title}</div>
-                        <div className="text-[10px] text-red-100 font-bold uppercase tracking-widest">
-                          {item.scheduledAt ? new Date(item.scheduledAt.toDate()).toLocaleString() : 'Join Now'}
+                  <div key={item.id} className="space-y-2">
+                    <a 
+                      href={item.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-4 bg-white/10 rounded-2xl border border-white/10 hover:bg-white/20 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="bg-white/10 p-2.5 rounded-xl text-white">
+                          <PlayCircle className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">{item.title}</div>
+                          <div className="text-[10px] text-red-100 font-bold uppercase tracking-widest">
+                            {item.scheduledAt ? new Date(item.scheduledAt.toDate()).toLocaleString() : 'Join Now'}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-white/60 group-hover:text-white transition-all" />
-                  </a>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Live Class</span>
+                        <ChevronRight className="h-4 w-4 text-white/60 group-hover:text-white transition-all" />
+                      </div>
+                    </a>
+                    {item.recordingLink && (
+                      <a 
+                        href={item.recordingLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-3 bg-red-500/20 rounded-2xl border border-white/5 hover:bg-red-500/30 transition-all cursor-pointer group ml-4"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-white/10 p-2 rounded-lg text-white">
+                            <Video className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold">Watch Recording</div>
+                          </div>
+                        </div>
+                        <ExternalLink className="h-3 w-3 text-white/60 group-hover:text-white transition-all" />
+                      </a>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -376,6 +482,24 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Floating Help Button for Mobile & Desktop */}
+      <motion.div 
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 1, type: 'spring' }}
+        className="fixed bottom-8 right-8 z-40"
+      >
+        <a 
+          href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center space-x-3 bg-green-600 text-white px-6 py-4 rounded-full shadow-2xl shadow-green-600/40 hover:bg-green-700 transition-all hover:scale-105 group"
+        >
+          <Phone className="h-5 w-5" />
+          <span className="font-bold text-sm hidden md:block">Need Help?</span>
+        </a>
+      </motion.div>
+    </motion.div>
   );
 }

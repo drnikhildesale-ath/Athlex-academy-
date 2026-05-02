@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import ReactMarkdown from 'react-markdown';
@@ -192,99 +193,115 @@ export default function QuizPage({ user }: QuizPageProps) {
       </div>
 
       {/* Question Card */}
-      <div className="bg-white p-10 md:p-16 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-blue-50 rounded-bl-[5rem] -z-0 opacity-50"></div>
-        
-        <div className="relative z-10">
-          <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center mb-10 shadow-inner">
-            <Dumbbell className="h-8 w-8 text-blue-600" />
-          </div>
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key={currentQuestion}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white p-10 md:p-16 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 w-48 h-48 bg-blue-50 rounded-bl-[5rem] -z-0 opacity-50"></div>
           
-          <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-12 leading-tight tracking-tight">
-            {question.question}
-          </h2>
-
-          <div className="space-y-4 mb-12">
-            {question.options.map((option: string, idx: number) => {
-              const isSelected = selectedAnswer === idx;
-              const isCorrectOption = idx === question.correctAnswer;
-              
-              let buttonClass = "w-full p-6 rounded-2xl border-2 text-left font-bold transition-all flex items-center justify-between group ";
-              
-              if (showExplanation) {
-                if (isCorrectOption) {
-                  buttonClass += "bg-green-50 border-green-200 text-green-700";
-                } else if (isSelected) {
-                  buttonClass += "bg-red-50 border-red-200 text-red-700";
-                } else {
-                  buttonClass += "bg-slate-50 border-slate-100 text-slate-400 opacity-50";
-                }
-              } else {
-                buttonClass += "bg-slate-50 border-slate-100 text-slate-700 hover:border-blue-200 hover:bg-blue-50/50 hover:text-blue-600";
-              }
-
-              return (
-                <button
-                  key={idx}
-                  onClick={() => handleAnswerSelect(idx)}
-                  disabled={showExplanation}
-                  className={buttonClass}
-                >
-                  <span className="flex-grow">{option}</span>
-                  {showExplanation && isCorrectOption && <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />}
-                  {showExplanation && isSelected && !isCorrectOption && <XCircle className="h-6 w-6 text-red-600 flex-shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-
-          {showExplanation && (
-            <div className={`p-8 rounded-[2rem] mb-12 animate-in fade-in slide-in-from-top-4 duration-500 ${
-              isCorrect ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'
-            }`}>
-              <div className="flex items-center space-x-3 mb-4">
-                {isCorrect ? (
-                  <div className="bg-green-100 p-2 rounded-lg text-green-600"><CheckCircle2 className="h-5 w-5" /></div>
-                ) : (
-                  <div className="bg-red-100 p-2 rounded-lg text-red-600"><AlertCircle className="h-5 w-5" /></div>
-                )}
-                <h4 className={`font-black uppercase tracking-widest text-xs ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
-                  {isCorrect ? 'Correct Answer' : 'Incorrect Answer'}
-                </h4>
-              </div>
-              <div className="prose prose-slate max-w-none text-slate-600 font-medium leading-relaxed">
-                <ReactMarkdown>{question.explanation}</ReactMarkdown>
-              </div>
+          <div className="relative z-10">
+            <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center mb-10 shadow-inner">
+              <Dumbbell className="h-8 w-8 text-blue-600" />
             </div>
-          )}
-
-          <div className="flex items-center justify-between pt-10 border-t border-slate-50">
-            <button
-              onClick={handlePrevious}
-              disabled={currentQuestion === 0}
-              className="flex items-center text-slate-400 hover:text-slate-900 font-bold uppercase tracking-widest text-xs transition-colors disabled:opacity-0"
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </button>
             
-            <button
-              onClick={handleNext}
-              disabled={!showExplanation || submitting}
-              className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center group"
-            >
-              {submitting ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  {currentQuestion === quiz.questions.length - 1 ? 'Finish Quiz' : 'Next Question'}
-                  <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-12 leading-tight tracking-tight">
+              {question.question}
+            </h2>
+
+            <div className="space-y-4 mb-12">
+              {question.options.map((option: string, idx: number) => {
+                const isSelected = selectedAnswer === idx;
+                const isCorrectOption = idx === question.correctAnswer;
+                
+                let buttonClass = "w-full p-6 rounded-2xl border-2 text-left font-bold transition-all flex items-center justify-between group ";
+                
+                if (showExplanation) {
+                  if (isCorrectOption) {
+                    buttonClass += "bg-green-50 border-green-200 text-green-700";
+                  } else if (isSelected) {
+                    buttonClass += "bg-red-50 border-red-200 text-red-700";
+                  } else {
+                    buttonClass += "bg-slate-50 border-slate-100 text-slate-400 opacity-50";
+                  }
+                } else {
+                  buttonClass += "bg-slate-50 border-slate-100 text-slate-700 hover:border-blue-200 hover:bg-blue-50/50 hover:text-blue-600";
+                }
+
+                return (
+                  <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    key={idx}
+                    onClick={() => handleAnswerSelect(idx)}
+                    disabled={showExplanation}
+                    className={buttonClass}
+                  >
+                    <span className="flex-grow">{option}</span>
+                    {showExplanation && isCorrectOption && <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />}
+                    {showExplanation && isSelected && !isCorrectOption && <XCircle className="h-6 w-6 text-red-600 flex-shrink-0" />}
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {showExplanation && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={`p-8 rounded-[2rem] mb-12 ${
+                  isCorrect ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'
+                }`}
+              >
+                <div className="flex items-center space-x-3 mb-4">
+                  {isCorrect ? (
+                    <div className="bg-green-100 p-2 rounded-lg text-green-600"><CheckCircle2 className="h-5 w-5" /></div>
+                  ) : (
+                    <div className="bg-red-100 p-2 rounded-lg text-red-600"><AlertCircle className="h-5 w-5" /></div>
+                  )}
+                  <h4 className={`font-black uppercase tracking-widest text-xs ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                    {isCorrect ? 'Correct Answer' : 'Incorrect Answer'}
+                  </h4>
+                </div>
+                <div className="prose prose-slate max-w-none text-slate-600 font-medium leading-relaxed">
+                  <ReactMarkdown>{question.explanation}</ReactMarkdown>
+                </div>
+              </motion.div>
+            )}
+
+            <div className="flex items-center justify-between pt-10 border-t border-slate-50">
+              <button
+                onClick={handlePrevious}
+                disabled={currentQuestion === 0}
+                className="flex items-center text-slate-400 hover:text-slate-900 font-bold uppercase tracking-widest text-xs transition-colors disabled:opacity-0"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </button>
+              
+              <button
+                onClick={handleNext}
+                disabled={!showExplanation || submitting}
+                className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center group"
+              >
+                {submitting ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    {currentQuestion === quiz.questions.length - 1 ? 'Finish Quiz' : 'Next Question'}
+                    <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

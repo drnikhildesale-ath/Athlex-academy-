@@ -51,7 +51,7 @@ export default function App() {
                 email: firebaseUser.email,
                 displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
                 photoURL: firebaseUser.photoURL || '',
-                role: firebaseUser.email === 'drnikhildesale@gmail.com' ? 'admin' : 'student',
+                role: ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'].includes(firebaseUser.email || '') ? 'admin' : 'student',
                 createdAt: serverTimestamp()
               };
               
@@ -64,7 +64,8 @@ export default function App() {
               }
             } else {
               const userData = userSnap.data();
-              const isAdminEmail = firebaseUser.email === 'drnikhildesale@gmail.com';
+              const adminEmails = ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'];
+              const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
               
               // Auto-fix: If user has admin email but is marked as student, update Firestore
               if (isAdminEmail && (userData as any).role !== 'admin') {
@@ -87,7 +88,7 @@ export default function App() {
           console.error("Auth State Error:", error);
           // Fallback: allow app to load even if Firestore check fails
           setUser(firebaseUser ? { uid: firebaseUser.uid, email: firebaseUser.email } : null);
-          setIsAdmin(firebaseUser?.email === 'drnikhildesale@gmail.com');
+          setIsAdmin(!!firebaseUser?.email && ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'].includes(firebaseUser.email));
         } finally {
           setLoading(false);
         }
