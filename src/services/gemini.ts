@@ -61,6 +61,58 @@ export async function generateQuizFromNotes(notes: string, numQuestions: number 
   }
 }
 
+export interface Flashcard {
+  front: string;
+  back: string;
+}
+
+export async function generateFlashcardsFromNotes(notes: string, numCards: number = 10): Promise<Flashcard[]> {
+  const currentApiKey = process.env.GEMINI_API_KEY;
+  if (!currentApiKey) {
+    throw new Error("GEMINI_API_KEY is not set.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: currentApiKey });
+  const model = "gemini-3-flash-preview";
+
+  const prompt = `Generate a set of exactly ${numCards} educational flashcards based on the following study notes for the ACE-CPT certification. 
+  Each flashcard should have a 'front' (the question or term) and a 'back' (the answer or definition).
+  Make them highly effective for quick revision of complex sports science and fitness concepts.
+  
+  Notes:
+  ${notes}
+  
+  Return the result as a JSON array of objects.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              front: { type: Type.STRING, description: "The term or question on the front of the card." },
+              back: { type: Type.STRING, description: "The definition or answer on the back of the card." }
+            },
+            required: ["front", "back"]
+          }
+        }
+      }
+    });
+
+    const text = response.text;
+    if (!text) return [];
+    return JSON.parse(text.trim());
+  } catch (error) {
+    console.error("Flashcard Generation Error:", error);
+    throw error;
+  }
+}
+
 export async function summarizeNotes(notes: string): Promise<string> {
   const currentApiKey = process.env.GEMINI_API_KEY;
   if (!currentApiKey) {

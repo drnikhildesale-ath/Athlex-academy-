@@ -17,7 +17,8 @@ export default function AuthPage() {
       let message = "Failed to sign in with Google.";
       
       if (err.code === 'auth/unauthorized-domain') {
-        message = "This domain is not authorized in Firebase. Please add this URL to your Firebase Console -> Authentication -> Settings -> Authorized Domains.";
+        const currentDomain = window.location.hostname;
+        message = `This domain (${currentDomain}) is not authorized in Firebase. Please add "${currentDomain}" to your Firebase Console -> Authentication -> Settings -> Authorized Domains.`;
       } else if (err.code === 'auth/popup-blocked') {
         message = "The login popup was blocked by your browser. Please allow popups for this site.";
       } else if (err.code === 'auth/popup-closed-by-user') {

@@ -118,6 +118,31 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "student", "thumbnail", "videoUrl", "createdAt"]
+    },
+    "FlashcardSet": {
+      "title": "Flashcard Set",
+      "description": "A set of flashcards for a specific chapter or topic.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "chapter": { "type": "string" },
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "front": { "type": "string" },
+              "back": { "type": "string" }
+            },
+            "required": ["front", "back"]
+          }
+        },
+        "assignedTo": { "type": "array", "items": { "type": "string" }, "description": "List of student UIDs assigned to this set." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "cards", "createdAt", "createdBy"]
     }
   },
   "firestore": {
@@ -148,6 +173,10 @@
     "/successStories/{storyId}": {
       "schema": "SuccessStory",
       "description": "Student success stories for the landing page."
+    },
+    "/flashcards/{setId}": {
+      "schema": "FlashcardSet",
+      "description": "Collection of chapter flashcards."
     }
   }
 }

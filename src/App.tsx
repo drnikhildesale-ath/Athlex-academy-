@@ -12,6 +12,7 @@ import AuthPage from './pages/AuthPage';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import QuizPage from './pages/QuizPage';
+import FlashcardsPage from './pages/FlashcardsPage';
 
 const logoImg = "https://lh3.googleusercontent.com/d/12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl";
 
@@ -144,6 +145,10 @@ export default function App() {
               <Route 
                 path="/quiz/:id" 
                 element={user ? <QuizPage user={user} /> : <Navigate to="/auth" />} 
+              />
+              <Route 
+                path="/flashcards/:setId" 
+                element={user ? <FlashcardsPage /> : <Navigate to="/auth" />} 
               />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>

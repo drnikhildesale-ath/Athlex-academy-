@@ -13,6 +13,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
   const [quizzes, setQuizzes] = React.useState<any[]>([]);
   const [materials, setMaterials] = React.useState<any[]>([]);
   const [liveClasses, setLiveClasses] = React.useState<any[]>([]);
+  const [flashcardSets, setFlashcardSets] = React.useState<any[]>([]);
   const [scores, setScores] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [showGuide, setShowGuide] = React.useState(() => {
@@ -58,6 +59,15 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       setLiveClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'liveClasses'));
 
+    // Fetch assigned flashcard sets
+    const flashcardsQuery = query(
+      collection(db, 'flashcards'),
+      where('assignedTo', 'array-contains', user.uid)
+    );
+    const unsubscribeFlashcards = onSnapshot(flashcardsQuery, (snapshot) => {
+      setFlashcardSets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'flashcards'));
+
     const scoresQuery = query(
       collection(db, 'scores'), 
       where('studentId', '==', user.uid),
@@ -72,6 +82,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       unsubscribeQuizzes();
       unsubscribeMaterials();
       unsubscribeLiveClasses();
+      unsubscribeFlashcards();
       unsubscribeScores();
     };
   }, [user.uid]);
@@ -275,6 +286,57 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 <p className="text-slate-500">Check back soon for new signature academy quizzes.</p>
               </div>
             )}
+          </div>
+
+          <div className="pt-8">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-slate-900 tracking-tight">AI Generated Flashcards</h2>
+              <span className="text-sm font-bold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                {flashcardSets.length} Sets
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {flashcardSets.length > 0 ? flashcardSets.map((set, idx) => (
+                <Link key={set.id} to={`/flashcards/${set.id}`} className="block">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="group bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-2 transition-all relative overflow-hidden h-full"
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-[3rem] -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
+                    
+                    <div className="relative z-10">
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 group-hover:rotate-6 bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white">
+                        <Trophy className="h-7 w-7" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors mb-2">{set.title}</h3>
+                      <p className="text-slate-500 text-sm mb-6 line-clamp-2 leading-relaxed">
+                        Master {set.cards?.length || 0} key terms from Chapter {set.chapter} using our interactive flashcard system.
+                      </p>
+                      
+                      <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                        <div className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                          <BookOpen className="h-4 w-4 mr-2" /> {set.cards?.length || 0} Cards
+                        </div>
+                        <div className="text-blue-600 font-black flex items-center text-sm uppercase tracking-widest">
+                          Study Now <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </Link>
+              )) : (
+                <div className="col-span-full p-12 bg-white rounded-[3rem] border border-dashed border-slate-200 text-center">
+                  <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Trophy className="h-8 w-8 text-slate-300" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">No Flashcards Assigned</h3>
+                  <p className="text-slate-500">Focus on your quizzes and study materials for now.</p>
+                </div>
+              )}
+            </div>
           </div>
         </motion.div>
 

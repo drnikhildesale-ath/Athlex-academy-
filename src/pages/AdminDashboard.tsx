@@ -2,9 +2,9 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { generateQuizFromNotes, summarizeNotes, MCQ } from '../services/gemini';
+import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
-import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle } from 'lucide-react';
+import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -36,8 +36,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [inquiries, setInquiries] = React.useState<any[]>([]);
   const [students, setStudents] = React.useState<any[]>([]);
   const [successStories, setSuccessStories] = React.useState<any[]>([]);
+  const [flashcardSets, setFlashcardSets] = React.useState<any[]>([]);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories'>('quizzes');
+  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards'>('quizzes');
+
+  // Flashcard Form
+  const [flashcardTitle, setFlashcardTitle] = React.useState('');
+  const [flashcardChapter, setFlashcardChapter] = React.useState('1');
+  const [numFlashcards, setNumFlashcards] = React.useState(10);
+  const [flashcardNotes, setFlashcardNotes] = React.useState('');
+  const [draftFlashcards, setDraftFlashcards] = React.useState<Flashcard[] | null>(null);
+  const [showFlashcardReview, setShowFlashcardReview] = React.useState(false);
 
   // New Content Forms
   const [materialTitle, setMaterialTitle] = React.useState('');
@@ -93,6 +102,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setSuccessStories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'successStories'));
 
+    const unsubscribeFlashcards = onSnapshot(query(collection(db, 'flashcards'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setFlashcardSets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'flashcards'));
+
     return () => {
       unsubscribeQuizzes();
       unsubscribeStudents();
@@ -100,6 +113,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       unsubscribeLiveClasses();
       unsubscribeInquiries();
       unsubscribeStories();
+      unsubscribeFlashcards();
     };
   }, []);
 
@@ -365,6 +379,70 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleGenerateFlashcardDraft = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!flashcardNotes || !flashcardTitle) return;
+
+    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+      await window.aistudio.openSelectKey();
+    }
+
+    setGenerating(true);
+    setStatus(null);
+    try {
+      const generatedCards = await generateFlashcardsFromNotes(flashcardNotes, numFlashcards);
+      setDraftFlashcards(generatedCards);
+      setShowFlashcardReview(true);
+    } catch (err: any) {
+      console.error("Flashcard Generation Error:", err);
+      setStatus({ type: 'error', message: err.message || "Failed to generate flashcards." });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleSaveFlashcards = async () => {
+    if (!flashcardTitle || !draftFlashcards) return;
+
+    try {
+      await addDoc(collection(db, 'flashcards'), {
+        title: flashcardTitle,
+        chapter: flashcardChapter,
+        cards: draftFlashcards,
+        assignedTo: [],
+        createdAt: serverTimestamp(),
+        createdBy: user.uid
+      });
+
+      setFlashcardNotes('');
+      setFlashcardTitle('');
+      setDraftFlashcards(null);
+      setShowFlashcardReview(false);
+      setStatus({ type: 'success', message: "Flashcard set published successfully!" });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.CREATE, 'flashcards');
+    }
+  };
+
+  const handleAssignFlashcards = async (setId: string, studentIds: string[]) => {
+    try {
+      await setDoc(doc(db, 'flashcards', setId), { assignedTo: studentIds }, { merge: true });
+      setStatus({ type: 'success', message: "Flashcard assignments updated!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `flashcards/${setId}`);
+    }
+  };
+
+  const handleDeleteFlashcards = async (id: string) => {
+    if (window.confirm("Delete this flashcard set?")) {
+      try {
+        await deleteDoc(doc(db, 'flashcards', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `flashcards/${id}`);
+      }
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <motion.div 
@@ -382,6 +460,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           { id: 'quizzes', label: 'Quizzes', icon: <Dumbbell className="h-4 w-4" /> },
           { id: 'materials', label: 'Study Materials', icon: <FileText className="h-4 w-4" /> },
           { id: 'liveClasses', label: 'Live Classes', icon: <Video className="h-4 w-4" /> },
+          { id: 'flashcards', label: 'Flashcards', icon: <BookCheck className="h-4 w-4" /> },
           { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-4 w-4" /> },
           { id: 'stories', label: 'Success Stories', icon: <Trophy className="h-4 w-4" /> }
         ].map((tab) => (
@@ -441,6 +520,36 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   ))}
                 </div>
                 <div className="text-sm text-slate-500 italic">Explanation: {q.explanation}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : showFlashcardReview && draftFlashcards ? (
+        <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl mb-12 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Review Generated Flashcards: {flashcardTitle}</h2>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setShowFlashcardReview(false)}
+                className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all"
+              >
+                Back to Edit
+              </button>
+              <button
+                onClick={handleSaveFlashcards}
+                className="px-10 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+              >
+                Publish Flashcard Set
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {draftFlashcards.map((card, idx) => (
+              <div key={idx} className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col h-full">
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Card {idx + 1}</div>
+                <div className="font-bold text-slate-900 mb-4 pb-4 border-b border-white/50">{card.front}</div>
+                <div className="text-slate-600 text-sm font-medium">{card.back}</div>
               </div>
             ))}
           </div>
@@ -806,6 +915,97 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-all shadow-xl shadow-red-500/20"
                   >
                     Add Class Link
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {activeTab === 'flashcards' && (
+              <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-blue-50 p-3 rounded-2xl">
+                    <Sparkles className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">AI Flashcard Generator</h2>
+                </div>
+
+                <form onSubmit={handleGenerateFlashcardDraft} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Set Title</label>
+                    <input
+                      type="text"
+                      value={flashcardTitle}
+                      onChange={(e) => setFlashcardTitle(e.target.value)}
+                      placeholder="e.g. Chapter 4 Key Terms"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Chapter</label>
+                    <input
+                      type="text"
+                      value={flashcardChapter}
+                      onChange={(e) => setFlashcardChapter(e.target.value)}
+                      placeholder="e.g. 1"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Number of Cards</label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="30"
+                      value={numFlashcards}
+                      onChange={(e) => setNumFlashcards(parseInt(e.target.value))}
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Chapter Notes</label>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors"
+                      >
+                        Upload PDF
+                      </button>
+                    </div>
+                    <textarea
+                      value={flashcardNotes}
+                      onChange={(e) => setFlashcardNotes(e.target.value)}
+                      placeholder="Paste notes for the card content..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium h-48 resize-none"
+                      required
+                    />
+                  </div>
+
+                  {status && activeTab === 'flashcards' && (
+                    <div className={`p-4 rounded-2xl flex items-center space-x-3 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
+                      status.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                    }`}>
+                      {status.type === 'success' ? <CheckCircle2 className="h-5 w-5 flex-shrink-0" /> : <AlertCircle className="h-5 w-5 flex-shrink-0" />}
+                      <span>{status.message}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={generating}
+                    className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {generating ? (
+                      <Loader2 className="h-6 w-6 animate-spin mr-3" />
+                    ) : (
+                      <Sparkles className="h-5 w-5 mr-3" />
+                    )}
+                    {generating ? 'Generating...' : 'Generate Flashcards'}
                   </button>
                 </form>
               </div>
@@ -1244,6 +1444,85 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         <Video className="h-10 w-10 text-slate-300" />
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 mb-2">No Live Classes Added</h3>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {activeTab === 'flashcards' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Manage Flashcard Sets</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {flashcardSets.length} Total
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-8">
+                  {flashcardSets.length > 0 ? flashcardSets.map((set) => (
+                    <div
+                      key={set.id}
+                      className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center space-x-6">
+                          <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center">
+                            <BookCheck className="h-8 w-8 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-slate-900 mb-1">{set.title}</h3>
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                              Chapter {set.chapter} • {set.cards?.length || 0} Cards • Published {new Date(set.createdAt?.toDate()).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteFlashcards(set.id)}
+                          className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+
+                      <div className="pt-6 border-t border-slate-50">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Assign Student Access</label>
+                        <div className="flex flex-wrap gap-3">
+                          {students.map((student) => {
+                            const isAssigned = set.assignedTo?.includes(student.id);
+                            return (
+                              <button
+                                key={student.id}
+                                onClick={() => {
+                                  const newAssigned = isAssigned
+                                    ? set.assignedTo.filter((id: string) => id !== student.id)
+                                    : [...(set.assignedTo || []), student.id];
+                                  handleAssignFlashcards(set.id, newAssigned);
+                                }}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                  isAssigned 
+                                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                                    : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-blue-200'
+                                }`}
+                              >
+                                {student.photoURL ? (
+                                  <img src={student.photoURL} className="w-4 h-4 rounded-full" alt="" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <Users className="w-3 h-3" />
+                                )}
+                                <span>{student.displayName || student.email}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="p-20 bg-white rounded-[3rem] border border-dashed border-slate-200 text-center">
+                      <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8">
+                        <BookCheck className="h-10 w-10 text-slate-300" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">No Flashcards Found</h3>
+                      <p className="text-slate-500 text-sm">Create your first flashcard set using the AI generator.</p>
                     </div>
                   )}
                 </div>
