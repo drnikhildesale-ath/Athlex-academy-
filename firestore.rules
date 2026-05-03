@@ -103,7 +103,8 @@ service cloud.firestore {
              data.quizTitle is string &&
              data.score is number &&
              data.totalQuestions is number &&
-             data.completedAt is timestamp;
+             data.completedAt is timestamp &&
+             (data.get('courseId', null) == null || data.courseId is string);
     }
 
     function isValidMaterial(data) {
@@ -153,7 +154,18 @@ service cloud.firestore {
     function isValidCourse(data) {
       return hasRequiredFields(['title', 'createdAt']) &&
              data.title is string && data.title.size() > 0 &&
-             data.createdAt is timestamp;
+             data.createdAt is timestamp &&
+             (data.get('totalQuizzes', null) == null || data.totalQuizzes is number);
+    }
+
+    function isValidNotification(data) {
+      return hasRequiredFields(['type', 'createdAt', 'read']) &&
+             data.type in ['new_student', 'new_inquiry', 'quiz_completed'] &&
+             data.createdAt is timestamp &&
+             data.read is bool &&
+             (data.get('studentId', null) == null || data.studentId is string) &&
+             (data.get('studentName', null) == null || data.studentName is string) &&
+             (data.get('studentEmail', null) == null || data.studentEmail is string);
     }
 
     function isValidFeedback(data) {
@@ -239,6 +251,11 @@ service cloud.firestore {
              data.uid == request.auth.uid &&
              data.courseId is string &&
              data.completedItems is list;
+    }
+
+    match /notifications/{notificationId} {
+      allow create: if isSignedIn() && isValidNotification(incoming());
+      allow read, update, delete: if isAdmin();
     }
 
     match /userProgress/{progressId} {

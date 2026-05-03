@@ -327,13 +327,12 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     flashcards: flashcardSets.filter(s => s.courseId === activeCourseId)
   };
 
-  const TOTAL_TARGET_ITEMS = activeCourseItems.recordings.length + 
-                           activeCourseItems.materials.length +
-                           activeCourseItems.quizzes.length;
+  const activeCourse = courses.find(c => c.id === activeCourseId);
+  const totalQuizzesForProgress = activeCourse?.totalQuizzes || 16;
+  const uniqueQuizzesSolved = new Set(courseScores.map(s => s.quizId)).size;
   
-  const currentCompletedCount = completedItems.length + courseScores.length;
-  const roadmapProgress = TOTAL_TARGET_ITEMS > 0 
-    ? Math.min(Math.round((currentCompletedCount / TOTAL_TARGET_ITEMS) * 100), 100)
+  const roadmapProgress = totalQuizzesForProgress > 0 
+    ? Math.min(Math.round((uniqueQuizzesSolved / totalQuizzesForProgress) * 100), 100)
     : 0;
 
   const isApprovedForActiveCourse = user.approvedCourseIds?.includes(activeCourseId);
@@ -1179,8 +1178,12 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                     </div>
                     <div>
                       <div className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">{score.quizTitle}</div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                        {score.completedAt?.toDate ? new Date(score.completedAt.toDate()).toLocaleDateString() : 'Manual Record'}
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest">{score.score}/{score.totalQuestions} Marks</span>
+                        <span className="text-[10px] text-slate-300">•</span>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                          {score.completedAt?.toDate ? new Date(score.completedAt.toDate()).toLocaleDateString() : 'Manual Record'}
+                        </div>
                       </div>
                     </div>
                   </div>

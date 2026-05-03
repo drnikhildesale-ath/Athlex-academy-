@@ -93,6 +93,7 @@ export default function QuizPage({ user }: QuizPageProps) {
         studentId: user.uid,
         quizId: quiz.id,
         quizTitle: quiz.title,
+        courseId: quiz.courseId,
         score,
         totalQuestions: quiz.questions.length,
         totalPossible,

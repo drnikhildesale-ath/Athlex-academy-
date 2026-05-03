@@ -57,11 +57,11 @@ export const Chatbot: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 left-6 z-50">
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 20, scale: 0.95, transformOrigin: 'bottom left' }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="mb-4 w-80 sm:w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-100"
@@ -154,13 +154,13 @@ export const Chatbot: React.FC = () => {
       <AnimatePresence>
         {!isOpen && showNudge && (
           <motion.div
-            initial={{ opacity: 0, x: 20, scale: 0.8 }}
+            initial={{ opacity: 0, x: -20, scale: 0.8 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 20, scale: 0.8 }}
-            className="absolute bottom-20 right-0 mb-2 mr-2 bg-white px-4 py-2 rounded-2xl shadow-xl border border-blue-100 text-sm font-bold text-blue-600 whitespace-nowrap"
+            exit={{ opacity: 0, x: -20, scale: 0.8 }}
+            className="absolute bottom-20 left-0 mb-2 ml-2 bg-white px-4 py-2 rounded-2xl shadow-xl border border-blue-100 text-sm font-bold text-blue-600 whitespace-nowrap"
           >
             Ask me your doubts!
-            <div className="absolute bottom-0 right-6 transform translate-y-1/2 rotate-45 w-3 h-3 bg-white border-r border-b border-blue-100"></div>
+            <div className="absolute bottom-0 left-6 transform translate-y-1/2 rotate-45 w-3 h-3 bg-white border-l border-b border-blue-100"></div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -176,7 +176,7 @@ export const Chatbot: React.FC = () => {
       >
         {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
         {!isOpen && (
-          <span className="absolute right-full mr-4 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          <span className="absolute left-full ml-4 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
             Ask me your doubts
           </span>
         )}

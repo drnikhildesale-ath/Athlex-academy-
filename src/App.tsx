@@ -47,11 +47,24 @@ export default function App() {
                   displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
                   photoURL: firebaseUser.photoURL || '',
                   role: ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'].includes(firebaseUser.email || '') ? 'admin' : 'student',
-                  createdAt: serverTimestamp()
+                  createdAt: serverTimestamp(),
+                  lastLogin: serverTimestamp()
                 };
                 
                 try {
                   await setDoc(userRef, newUser);
+                  
+                  // Notify admin about new student
+                  if (newUser.role === 'student') {
+                    await addDoc(collection(db, 'notifications'), {
+                      type: 'new_student',
+                      studentId: firebaseUser.uid,
+                      studentName: newUser.displayName,
+                      studentEmail: newUser.email,
+                      createdAt: serverTimestamp(),
+                      read: false
+                    });
+                  }
                 } catch (err) {
                   handleFirestoreError(err, OperationType.CREATE, `users/${firebaseUser.uid}`);
                 }
@@ -59,6 +72,13 @@ export default function App() {
                 const userData = userSnap.data();
                 const adminEmails = ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'];
                 const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
+                
+                // Update last login
+                try {
+                  await updateDoc(userRef, { lastLogin: serverTimestamp() });
+                } catch (err) {
+                  // Ignore last login update errors to not block the app
+                }
                 
                 // Auto-fix: If user has admin email but is marked as student, update Firestore
                 if (isAdminEmail && (userData as any).role !== 'admin') {

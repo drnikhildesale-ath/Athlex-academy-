@@ -129,44 +129,60 @@ export default function FlashcardsPage() {
             <motion.div
               key={currentIndex}
               custom={direction}
-              initial={{ x: direction * 100, opacity: 0, rotateY: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -direction * 100, opacity: 0 }}
+              initial={{ x: direction * 100, opacity: 0, scale: 0.9, rotateY: direction * 10 }}
+              animate={{ x: 0, opacity: 1, scale: 1, rotateY: 0 }}
+              exit={{ x: -direction * 100, opacity: 0, scale: 0.9, rotateY: -direction * 10 }}
               transition={{ type: 'spring', damping: 20, stiffness: 100 }}
               className="w-full h-full cursor-pointer touch-none"
               onClick={() => setIsFlipped(!isFlipped)}
             >
-              <div className={`relative w-full h-full transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+              <motion.div 
+                className="relative w-full h-full preserve-3d"
+                initial={false}
+                animate={{ rotateY: isFlipped ? 180 : 0 }}
+                transition={{ 
+                  type: 'spring', 
+                  stiffness: 300, 
+                  damping: 20,
+                  mass: 1
+                }}
+                style={{ transformStyle: 'preserve-3d' }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
                 {/* Front */}
-                <div className="absolute inset-0 backface-hidden bg-white rounded-[3rem] shadow-2xl shadow-slate-200/50 flex flex-col items-center justify-center p-12 text-center border border-slate-100">
+                <div className="absolute inset-0 backface-hidden bg-white rounded-[3rem] shadow-2xl shadow-slate-200/50 flex flex-col items-center justify-center p-12 text-center border border-slate-100 group">
                   <div className="absolute top-10 left-10 text-[10px] font-black text-blue-600 uppercase tracking-widest">Question</div>
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.front); }}
-                    className="absolute top-8 right-8 p-3 hover:bg-slate-50 rounded-2xl transition-colors text-slate-300 hover:text-blue-600"
+                    className="absolute top-8 right-8 p-3 hover:bg-slate-50 rounded-2xl transition-all text-slate-300 hover:text-blue-600 group-hover:scale-110"
                   >
                     <Volume2 className="h-5 w-5" />
                   </button>
                   <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">
                     {currentCard.front}
                   </h3>
-                  <div className="absolute bottom-10 text-xs font-bold text-slate-300 uppercase tracking-widest">Click to reveal answer</div>
+                  <div className="absolute bottom-10 text-xs font-bold text-slate-300 uppercase tracking-widest animate-pulse">Click to reveal answer</div>
                 </div>
 
                 {/* Back */}
-                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-blue-600 rounded-[3rem] shadow-2xl shadow-blue-500/20 flex flex-col items-center justify-center p-12 text-center text-white">
+                <div 
+                  className="absolute inset-0 backface-hidden rotate-y-180 bg-blue-600 rounded-[3rem] shadow-2xl shadow-blue-500/20 flex flex-col items-center justify-center p-12 text-center text-white"
+                  style={{ transform: 'rotateY(180deg)' }}
+                >
                   <div className="absolute top-10 left-10 text-[10px] font-black text-white/50 uppercase tracking-widest">Answer</div>
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.back); }}
-                    className="absolute top-8 right-8 p-3 hover:bg-white/10 rounded-2xl transition-colors text-white/50 hover:text-white"
+                    className="absolute top-8 right-8 p-3 hover:bg-white/10 rounded-2xl transition-all text-white/50 hover:text-white hover:scale-110"
                   >
                     <Volume2 className="h-5 w-5" />
                   </button>
                   <div className="text-xl md:text-2xl font-medium leading-relaxed">
                     {currentCard.back}
                   </div>
-                  <div className="absolute bottom-10 text-xs font-bold text-white/50 uppercase tracking-widest">Click to see question</div>
+                  <div className="absolute bottom-10 text-xs font-bold text-white/50 uppercase tracking-widest animate-pulse">Click to see question</div>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           </AnimatePresence>
         </div>

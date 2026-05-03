@@ -60,6 +60,7 @@
         "studentId": { "type": "string" },
         "quizId": { "type": "string" },
         "quizTitle": { "type": "string" },
+        "courseId": { "type": "string", "description": "ID of the associated course" },
         "score": { "type": "integer" },
         "totalQuestions": { "type": "integer" },
         "completedAt": { "type": "string", "format": "date-time" }
@@ -215,6 +216,7 @@
       "properties": {
         "title": { "type": "string" },
         "description": { "type": "string" },
+        "totalQuizzes": { "type": "integer", "description": "Total number of question papers/quizzes for this course to calculate progress." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "createdAt"]
@@ -265,9 +267,28 @@
         "lastAccessedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "courseId", "completedItems"]
+    },
+    "Notification": {
+      "title": "System Notification",
+      "description": "Alerts for admin about student activities.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["new_student", "new_inquiry", "quiz_completed"] },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentEmail": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "createdAt", "read"]
     }
   },
   "firestore": {
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Collection of system notifications for the admin."
+    },
     "/userProgress/{progressId}": {
       "schema": "UserProgress",
       "description": "Collection of student progress per course."

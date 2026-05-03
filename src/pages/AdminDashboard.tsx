@@ -42,10 +42,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [announcements, setAnnouncements] = React.useState<any[]>([]);
   const [recordings, setRecordings] = React.useState<any[]>([]);
   const [chatMessages, setChatMessages] = React.useState<any[]>([]);
+  const [notifications, setNotifications] = React.useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = React.useState(false);
   const [courses, setCourses] = React.useState<any[]>([]);
   const [activeCourseId, setActiveCourseId] = React.useState<string>('');
   const [courseTitle, setCourseTitle] = React.useState('');
   const [courseDescription, setCourseDescription] = React.useState('');
+  const [courseTotalQuizzes, setCourseTotalQuizzes] = React.useState(16);
   const [selectedStudentForChat, setSelectedStudentForChat] = React.useState<any>(null);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses' | 'students' | 'recordings'>('quizzes');
@@ -170,6 +173,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'chatMessages'));
 
+    const unsubscribeNotifications = onSnapshot(query(collection(db, 'notifications'), where('read', '==', false), orderBy('createdAt', 'desc')), (snapshot) => {
+      setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'notifications'));
+
     const unsubscribeCourses = onSnapshot(query(collection(db, 'courses'), orderBy('createdAt', 'desc')), (snapshot) => {
       const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCourses(fetchedCourses);
@@ -191,6 +198,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       unsubscribeKnowledge();
       unsubscribeAnnouncements();
       unsubscribeChats();
+      unsubscribeNotifications();
       unsubscribeCourses();
     };
   }, [activeCourseId]);
@@ -618,19 +626,26 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     const student = students.find(s => s.id === selectedStudentId);
 
     try {
+      const finalScore = isNaN(resultScore) ? 0 : resultScore;
+      const finalTotal = isNaN(resultTotal) || resultTotal <= 0 ? 100 : resultTotal;
+
       await addDoc(collection(db, 'scores'), {
         studentId: selectedStudentId,
         studentEmail: student?.email || 'Unknown',
+        quizId: `manual_${resultChapter}_${Date.now()}`,
         quizTitle: resultTitle || `Chapter ${resultChapter} Performance`,
         chapter: resultChapter,
         courseId: activeCourseId,
-        score: resultScore,
-        totalQuestions: resultTotal,
+        score: finalScore,
+        totalQuestions: finalTotal,
         completedAt: serverTimestamp(),
         manualEntry: true
       });
       
-      setResultChapter(String(parseInt(resultChapter) + 1));
+      const nextChapter = parseInt(resultChapter);
+      if (!isNaN(nextChapter)) {
+        setResultChapter(String(nextChapter + 1));
+      }
       setResultScore(0);
       setStatus({ type: 'success', message: "Student results recorded successfully!" });
     } catch (err) {
@@ -652,6 +667,24 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setNewMessage('');
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'chatMessages');
+    }
+  };
+
+  const handleMarkNotificationRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { read: true });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `notifications/${id}`);
+    }
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      const unread = notifications.filter(n => !n.read);
+      await Promise.all(unread.map(n => updateDoc(doc(db, 'notifications', n.id), { read: true })));
+      setShowNotifications(false);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, 'notifications/all');
     }
   };
 
@@ -750,13 +783,26 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       await addDoc(collection(db, 'courses'), {
         title: courseTitle,
         description: courseDescription,
+        totalQuizzes: isNaN(courseTotalQuizzes) ? 0 : courseTotalQuizzes,
         createdAt: serverTimestamp()
       });
       setCourseTitle('');
       setCourseDescription('');
+      setCourseTotalQuizzes(16);
       setStatus({ type: 'success', message: "Course created successfully!" });
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'courses');
+    }
+  };
+
+  const handleUpdateCourseTotalQuizzes = async (courseId: string, total: number) => {
+    try {
+      await updateDoc(doc(db, 'courses', courseId), {
+        totalQuizzes: total
+      });
+      setStatus({ type: 'success', message: "Course updated successfully!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `courses/${courseId}`);
     }
   };
 
@@ -855,8 +901,88 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </h1>
               <p className="text-slate-500 font-medium italic">Academy command suite and content management.</p>
             </div>
-            <AnimatePresence>
-              {status && (
+            
+            <div className="flex items-center space-x-6">
+              <div className="relative">
+                <button 
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-blue-600 hover:shadow-md transition-all relative"
+                >
+                  <Megaphone className="h-6 w-6" />
+                  {notifications.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-lg shadow-red-500/20">
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {showNotifications && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-4 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50 overflow-y-auto max-h-[500px]"
+                    >
+                      <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                        <h3 className="font-bold text-slate-900">Recent Alerts</h3>
+                        <button 
+                          onClick={handleMarkAllNotificationsRead}
+                          className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                      <div className="p-2">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center">
+                            <CheckCircle2 className="h-10 w-10 text-green-200 mx-auto mb-3" />
+                            <p className="text-sm font-bold text-slate-400">All caught up!</p>
+                          </div>
+                        ) : (
+                          notifications.map((n) => (
+                            <div 
+                              key={n.id} 
+                              className="p-4 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group relative"
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className={`p-2 rounded-xl mt-1 ${
+                                  n.type === 'new_student' ? 'bg-blue-50 text-blue-600' : 
+                                  n.type === 'new_inquiry' ? 'bg-purple-50 text-purple-600' : 'bg-green-50 text-green-600'
+                                }`}>
+                                  {n.type === 'new_student' ? <Users className="h-4 w-4" /> : 
+                                   n.type === 'new_inquiry' ? <Mail className="h-4 w-4" /> : <BookCheck className="h-4 w-4" />}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="text-xs font-bold text-slate-900 mb-1">
+                                    {n.type === 'new_student' ? 'New Student Joined' : 
+                                     n.type === 'new_inquiry' ? 'New Inquiry' : 'Activity'}
+                                  </div>
+                                  <div className="text-xs text-slate-500 font-medium line-clamp-2">
+                                    {n.studentName} ({n.studentEmail}) just logged in for the first time.
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-wider">
+                                    {n.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={() => handleMarkNotificationRead(n.id)}
+                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white rounded-lg transition-all"
+                                >
+                                  <X className="h-3 w-3 text-slate-400" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <AnimatePresence>
+                {status && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -872,7 +998,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               )}
             </AnimatePresence>
           </div>
-        </header>
+        </div>
+      </header>
 
         {showReview && draftQuiz ? (
         <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl mb-12 animate-in fade-in slide-in-from-bottom-4">
@@ -967,6 +1094,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                       value={courseTitle}
                       onChange={(e) => setCourseTitle(e.target.value)}
                       placeholder="e.g. ACE Certified Personal Trainer"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Total Question Papers (for Progress)</label>
+                    <input
+                      type="number"
+                      value={isNaN(courseTotalQuizzes) ? '' : courseTotalQuizzes}
+                      onChange={(e) => setCourseTotalQuizzes(parseInt(e.target.value))}
+                      placeholder="e.g. 16"
                       className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all font-medium"
                       required
                     />
@@ -1075,7 +1213,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                             type="number"
                             min="1"
                             max="50"
-                            value={numQuestions}
+                            value={isNaN(numQuestions) ? '' : numQuestions}
                             onChange={(e) => setNumQuestions(parseInt(e.target.value))}
                             className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
                           />
@@ -1087,7 +1225,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         <input
                           type="number"
                           min="1"
-                          value={pointsPerQuestion}
+                          value={isNaN(pointsPerQuestion) ? '' : pointsPerQuestion}
                           onChange={(e) => setPointsPerQuestion(parseInt(e.target.value))}
                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
                         />
@@ -1677,7 +1815,21 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Test Title</label>
+                      <input
+                        type="text"
+                        value={resultTitle}
+                        onChange={(e) => setResultTitle(e.target.value)}
+                        placeholder="e.g. Mid-Term Assessment"
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all font-medium"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Chapter</label>
                       <input
@@ -1692,9 +1844,19 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                       <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Score</label>
                       <input
                         type="number"
-                        value={resultScore}
+                        value={isNaN(resultScore) ? '' : resultScore}
                         onChange={(e) => setResultScore(parseInt(e.target.value))}
                         className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Out of</label>
+                      <input
+                        type="number"
+                        value={isNaN(resultTotal) ? '' : resultTotal}
+                        onChange={(e) => setResultTotal(parseInt(e.target.value))}
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all font-bold text-green-600 bg-green-50/50"
                         required
                       />
                     </div>
@@ -1882,7 +2044,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                       type="number"
                       min="5"
                       max="30"
-                      value={numFlashcards}
+                      value={isNaN(numFlashcards) ? '' : numFlashcards}
                       onChange={(e) => setNumFlashcards(parseInt(e.target.value))}
                       className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
                     />
@@ -2077,7 +2239,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Display Order</label>
                     <input
                       type="number"
-                      value={storyOrder}
+                      value={isNaN(storyOrder) ? '' : storyOrder}
                       onChange={(e) => setStoryOrder(parseInt(e.target.value))}
                       className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
                     />
@@ -2132,7 +2294,30 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         </button>
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 mb-2 truncate">{course.title}</h3>
-                      <p className="text-sm text-slate-500 font-medium line-clamp-2 mb-6">{course.description || "No description provided."}</p>
+                      <p className="text-sm text-slate-500 font-medium line-clamp-2 mb-4">{course.description || "No description provided."}</p>
+                      
+                      <div className="mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Configure Progress Scale</label>
+                        <div className="flex items-center space-x-3">
+                          <input 
+                            type="number"
+                            defaultValue={course.totalQuizzes || 0}
+                            id={`total-quizzes-${course.id}`}
+                            className="w-20 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold"
+                          />
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Question Papers</span>
+                          <button 
+                            onClick={() => {
+                              const val = parseInt((document.getElementById(`total-quizzes-${course.id}`) as HTMLInputElement).value);
+                              handleUpdateCourseTotalQuizzes(course.id, val);
+                            }}
+                            className="bg-indigo-600 text-white p-1.5 rounded-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
                       <button 
                         onClick={() => setActiveCourseId(course.id)}
                         className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${
@@ -2457,7 +2642,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-bold text-slate-900 truncate">{student.displayName || student.email}</h3>
+                          <div className="flex items-center space-x-2">
+                             <h3 className="font-bold text-slate-900 truncate">{student.displayName || student.email}</h3>
+                             {student.createdAt?.toDate && (Date.now() - student.createdAt.toDate().getTime()) < 24 * 60 * 60 * 1000 && (
+                               <span className="px-2 py-0.5 bg-green-500 text-white text-[8px] font-black uppercase tracking-widest rounded-md animate-pulse">New</span>
+                             )}
+                          </div>
                           <p className="text-xs text-slate-400 truncate">{student.email}</p>
                         </div>
                       </div>
