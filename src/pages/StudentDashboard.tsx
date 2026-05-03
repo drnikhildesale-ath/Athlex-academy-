@@ -55,7 +55,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       
       // Auto-select first course if none selected OR if current selected is not in approved list
       if (approvedCourses.length > 0) {
-        if (!activeCourseId || !user.approvedCourseIds.includes(activeCourseId)) {
+        if (!activeCourseId || !user.approvedCourseIds?.includes(activeCourseId)) {
           setActiveCourseId(approvedCourses[0].id);
         }
       } else {
