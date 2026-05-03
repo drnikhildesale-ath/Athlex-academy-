@@ -49,9 +49,17 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     // Fetch all available courses
     const unsubscribeCourses = onSnapshot(collection(db, 'courses'), (snapshot) => {
       const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCourses(fetchedCourses);
-      if (fetchedCourses.length > 0 && !activeCourseId) {
-        setActiveCourseId(fetchedCourses[0].id);
+      // Filter by approved course IDs from user profile
+      const approvedCourses = fetchedCourses.filter(c => user.approvedCourseIds?.includes(c.id));
+      setCourses(approvedCourses);
+      
+      // Auto-select first course if none selected OR if current selected is not in approved list
+      if (approvedCourses.length > 0) {
+        if (!activeCourseId || !user.approvedCourseIds.includes(activeCourseId)) {
+          setActiveCourseId(approvedCourses[0].id);
+        }
+      } else {
+        setActiveCourseId(null);
       }
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'courses'));
 
@@ -267,6 +275,39 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
         <div className="flex flex-col items-center space-y-4">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-500 font-bold animate-pulse uppercase tracking-widest text-xs">Loading Dashboard</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle case with no courses
+  if (courses.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-[3rem] p-12 text-center border border-slate-100 shadow-2xl shadow-blue-500/10">
+          <div className="bg-blue-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 animate-bounce-slow">
+            <Lock className="h-10 w-10 text-blue-600" />
+          </div>
+          <h1 className="text-3xl font-black font-serif italic text-slate-900 mb-4 italic">Academy Access Pending</h1>
+          <p className="text-slate-500 font-medium leading-relaxed mb-10 italic">
+            Welcome to <span className="text-slate-900 font-bold">Athlex Academy</span>. You don't have any assigned courses yet. Please wait for the admin to approve your enrollment.
+          </p>
+          <div className="space-y-4">
+            <a 
+              href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="block w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"
+            >
+              Contact Support
+            </a>
+            <Link 
+              to="/"
+              className="block w-full py-5 bg-slate-50 text-slate-400 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-100 transition-all"
+            >
+              Back to Home
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -1257,7 +1298,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       </AnimatePresence>
 
       {/* Floating Help & Chat Button */}
-      <div className="fixed bottom-8 right-8 z-40 flex flex-col items-end space-y-4">
+      <div className="fixed bottom-8 right-36 z-40 flex flex-col items-end space-y-4">
         <AnimatePresence>
           {isChatOpen && (
             <motion.div
