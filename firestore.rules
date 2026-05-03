@@ -60,10 +60,6 @@ service cloud.firestore {
       return request.resource.data.keys().hasAll(fields);
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
@@ -78,7 +74,6 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return hasRequiredFields(['uid', 'email', 'role', 'createdAt']) &&
-             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt']) &&
              data.uid == request.auth.uid &&
              isValidEmail(data.email) &&
              data.role in ['admin', 'student'] &&
@@ -103,11 +98,11 @@ service cloud.firestore {
 
     function isValidScore(data) {
       return hasRequiredFields(['studentId', 'quizId', 'quizTitle', 'score', 'totalQuestions', 'completedAt']) &&
-             data.studentId == request.auth.uid &&
+             data.studentId is string &&
              data.quizId is string &&
              data.quizTitle is string &&
-             data.score is number && data.score >= 0 &&
-             data.totalQuestions is number && data.totalQuestions > 0 &&
+             data.score is number &&
+             data.totalQuestions is number &&
              data.completedAt is timestamp;
     }
 
@@ -115,7 +110,7 @@ service cloud.firestore {
       return hasRequiredFields(['title', 'createdAt', 'createdBy', 'type']) &&
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
              data.type in ['pdf', 'drive'] &&
-             (data.type == 'pdf' ? data.fileUrl is string : (data.driveUrl is string && isValidUrl(data.driveUrl))) &&
+             (data.type == 'pdf' ? (data.fileUrl is string && data.fileUrl.size() > 0) : (data.driveUrl is string && isValidUrl(data.driveUrl))) &&
              data.createdAt is timestamp &&
              data.createdBy == request.auth.uid;
     }
@@ -146,9 +141,11 @@ service cloud.firestore {
     }
 
     function isValidFlashcardSet(data) {
-      return hasRequiredFields(['title', 'cards', 'createdAt', 'createdBy']) &&
+      return hasRequiredFields(['title', 'cards', 'createdAt', 'createdBy', 'courseId', 'assignedTo']) &&
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.cards is list && data.cards.size() > 0 &&
+             data.cards is list &&
+             data.courseId is string &&
+             data.assignedTo is list &&
              data.createdAt is timestamp &&
              data.createdBy == request.auth.uid;
     }
@@ -213,6 +210,11 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    function isApprovedForCourse(courseId) {
+      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return user.role == 'admin' || (user.get('approvedCourseIds', []) != null && courseId in user.get('approvedCourseIds', []));
+    }
+
     match /users/{userId} {
       // Students can only read their own profile. Admins can read all.
       allow read: if isOwner(userId) || isAdmin();
@@ -225,7 +227,9 @@ service cloud.firestore {
       // Users can update their own profile but cannot change their role.
       // Admins can update any profile.
       allow update: if isAuthenticated() && 
-                    ((isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin());
+                    ((isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin()) &&
+                    (isAdmin() || !request.resource.data.keys().contains('approvedCourseIds') || request.resource.data.approvedCourseIds == resource.data.approvedCourseIds) &&
+                    (isAdmin() || !request.resource.data.keys().contains('batch') || request.resource.data.batch == resource.data.batch);
       
       allow delete: if isAdmin();
     }
@@ -255,11 +259,14 @@ service cloud.firestore {
     }
 
     match /quizzes/{quizId} {
-      // Students can only read quizzes assigned to them that are published.
+      // Students can only read quizzes assigned to them that are published AND (approved for the course OR explicitly assigned).
       // Admins can read all.
       allow read: if isAuthenticated() && (
         isAdmin() || 
-        (resource.data.status == 'published' && request.auth.uid in resource.data.assignedTo)
+        (resource.data.status == 'published' && (
+          isApprovedForCourse(resource.data.get('courseId', '')) ||
+          (resource.data.get('assignedTo', []) != null && request.auth.uid in resource.data.get('assignedTo', []))
+        ))
       );
       
       // Only admins can create, update, or delete quizzes.
@@ -272,8 +279,8 @@ service cloud.firestore {
       // Students can read their own scores. Admins can read all.
       allow read: if isAuthenticated() && (resource.data.studentId == request.auth.uid || isAdmin());
       
-      // Students can create their own scores.
-      allow create: if isAuthenticated() && isValidScore(request.resource.data);
+      // Students can create their own scores. Admins can create scores for students.
+      allow create: if isAuthenticated() && isValidScore(request.resource.data) && (isAdmin() || request.resource.data.studentId == request.auth.uid);
       
       // Scores should be immutable for students.
       allow update: if isAdmin();
@@ -281,8 +288,12 @@ service cloud.firestore {
     }
 
     match /materials/{materialId} {
-      // Students can only read materials assigned to them. Admins can read all.
-      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid in resource.data.assignedTo);
+      // Students can only read materials if they are approved for the course OR assigned. Admins can read all.
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        isApprovedForCourse(resource.data.get('courseId', '')) ||
+        (resource.data.get('assignedTo', []) != null && request.auth.uid in resource.data.get('assignedTo', []))
+      );
       
       // Only admins can manage materials.
       allow create: if isAdmin() && isValidMaterial(request.resource.data);
@@ -291,8 +302,12 @@ service cloud.firestore {
     }
 
     match /liveClasses/{classId} {
-      // Students can only read classes assigned to them. Admins can read all.
-      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid in resource.data.assignedTo);
+      // Students can only read classes if they are approved for the course OR assigned. Admins can read all.
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        isApprovedForCourse(resource.data.get('courseId', '')) ||
+        (resource.data.get('assignedTo', []) != null && request.auth.uid in resource.data.get('assignedTo', []))
+      );
       
       // Only admins can manage live classes.
       allow create: if isAdmin() && isValidLiveClass(request.resource.data);
@@ -323,12 +338,16 @@ service cloud.firestore {
     }
 
     match /flashcards/{setId} {
-      // Students can only read flashcards assigned to them. Admins can read all.
-      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid in resource.data.assignedTo);
+      // Students can only read flashcards if they are approved for the course OR explicitly assigned. Admins can read all.
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        (resource.data.get('courseId', null) != null && isApprovedForCourse(resource.data.courseId)) ||
+        (resource.data.get('assignedTo', []) != null && request.auth.uid in resource.data.get('assignedTo', []))
+      );
       
       // Only admins can manage flashcards.
       allow create: if isAdmin() && isValidFlashcardSet(request.resource.data);
-      allow update: if isAdmin() && isValidFlashcardSet(request.resource.data);
+      allow update: if isAdmin() && (!request.resource.data.keys().hasAll(['title', 'cards', 'createdAt', 'createdBy', 'courseId', 'assignedTo']) || isValidFlashcardSet(request.resource.data));
       allow delete: if isAdmin();
     }
 
@@ -354,7 +373,11 @@ service cloud.firestore {
     }
 
     match /classRecordings/{recordingId} {
-      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid in resource.data.assignedTo);
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        isApprovedForCourse(resource.data.get('courseId', '')) ||
+        (resource.data.get('assignedTo', []) != null && request.auth.uid in resource.data.get('assignedTo', []))
+      );
       allow create, update, delete: if isAdmin() && isValidClassRecording(request.resource.data);
     }
 

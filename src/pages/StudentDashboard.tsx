@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, getDocs, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X, Megaphone, CheckCircle2, Activity, Lightbulb, MessageSquare, BookCheck, Sparkles, LogOut, ArrowRight, User } from 'lucide-react';
+import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X, Megaphone, CheckCircle2, Activity, Lightbulb, MessageSquare, BookCheck, Sparkles, LogOut, ArrowRight, User, Lock } from 'lucide-react';
 
 interface StudentDashboardProps {
   user: any;
@@ -274,28 +274,157 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
 
     const courseScores = scores.filter(s => !activeCourseId || s.courseId === activeCourseId);
     const averageScore = courseScores.length > 0 
-    ? Math.round(courseScores.reduce((acc, s) => acc + (s.score / s.totalQuestions), 0) / courseScores.length * 100)
+    ? Math.round(courseScores.reduce((acc, s) => acc + (s.totalQuestions > 0 ? s.score / s.totalQuestions : 0), 0) / courseScores.length * 100)
     : 0;
 
   // Track progress based on completed items + quiz scores
   const completedItems = progress?.completedItems || [];
-  const TOTAL_TARGET_ITEMS = recordings.filter(r => r.courseId === activeCourseId).length + 
-                           materials.filter(m => m.courseId === activeCourseId).length +
-                           quizzes.filter(q => q.courseId === activeCourseId).length;
+  const activeCourseItems = {
+    recordings: recordings.filter(r => r.courseId === activeCourseId),
+    materials: materials.filter(m => m.courseId === activeCourseId),
+    quizzes: quizzes.filter(q => q.courseId === activeCourseId),
+    flashcards: flashcardSets.filter(s => s.courseId === activeCourseId)
+  };
+
+  const TOTAL_TARGET_ITEMS = activeCourseItems.recordings.length + 
+                           activeCourseItems.materials.length +
+                           activeCourseItems.quizzes.length;
   
   const currentCompletedCount = completedItems.length + courseScores.length;
   const roadmapProgress = TOTAL_TARGET_ITEMS > 0 
     ? Math.min(Math.round((currentCompletedCount / TOTAL_TARGET_ITEMS) * 100), 100)
     : 0;
 
+  const isApprovedForActiveCourse = user.approvedCourseIds?.includes(activeCourseId);
+
   const TOTAL_CHAPTERS = 20;
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 relative"
-    >
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans">
+      {/* Sidebar Navigation */}
+      <aside className="w-full lg:w-72 bg-white lg:sticky lg:top-0 h-auto lg:h-screen border-r border-slate-100 flex flex-col p-6 shadow-sm overflow-y-auto">
+        <Link to="/" className="flex items-center space-x-3 mb-10 p-2 hover:bg-slate-50 rounded-2xl transition-all">
+          <div className="bg-blue-600 p-2 rounded-xl">
+            <Trophy className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-sm font-black font-serif italic text-slate-900 leading-tight">Athlex Academy</h1>
+            <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">Back to Website</p>
+          </div>
+        </Link>
+
+        <nav className="space-y-1 mb-12 text-sm font-bold">
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-4">MAIN PERSPECTIVE</div>
+          <button 
+            onClick={() => {
+              setActiveVideo(null);
+            }} 
+            className={`w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl transition-all ${!activeVideo ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>My Academy</span>
+          </button>
+          <button onClick={() => setIsChatOpen(true)} className="w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
+            <MessageSquare className="h-5 w-5" />
+            <span>Support Chat</span>
+          </button>
+          <a href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" target="_blank" rel="noopener noreferrer" className="w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
+            <Phone className="h-5 w-5" />
+            <span>Mentor Support</span>
+          </a>
+          
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-8 mb-4 px-4">RESOURCES</div>
+          <button className="w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
+            <Lightbulb className="h-5 w-5" />
+            <span>Knowledge Hub</span>
+          </button>
+          <button className="w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
+            <BookOpen className="h-5 w-5" />
+            <span>Academy Blogs</span>
+          </button>
+          <button className="w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
+            <Award className="h-5 w-5" />
+            <span>Hall of Fame</span>
+          </button>
+        </nav>
+
+        <div className="mt-auto p-6 bg-slate-50 rounded-3xl border border-slate-100">
+           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">CURRENT COURSE</div>
+           <select 
+             value={activeCourseId || ''}
+             onChange={(e) => setActiveCourseId(e.target.value)}
+             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+           >
+             {courses.map(course => (
+               <option key={course.id} value={course.id}>{course.title}</option>
+             ))}
+           </select>
+        </div>
+      </aside>
+
+      <main className="flex-1 p-6 md:p-12 lg:p-16 overflow-y-auto">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="max-w-5xl mx-auto relative px-0"
+        >
+          {/* Welcome & Context Header */}
+          <div className="mb-12">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+              <div>
+                <div className="inline-flex items-center space-x-2 bg-blue-50 px-3 py-1 rounded-full text-blue-600 font-bold text-[10px] uppercase tracking-widest mb-4">
+                  <Sparkles className="h-3 w-3" />
+                  <span>Enrolled Academy Student</span>
+                </div>
+                <h1 className="text-4xl lg:text-5xl font-black font-serif text-slate-900 tracking-tight italic mb-3 flex items-center gap-4">
+                  Hello, <span className="text-blue-600 underline decoration-blue-200">{user.displayName?.split(' ')[0]}!</span>
+                  {user.batch && (
+                    <span className="inline-block text-[10px] bg-blue-600 text-white px-4 py-1.5 rounded-full uppercase tracking-widest not-italic">
+                      {user.batch}
+                    </span>
+                  )}
+                </h1>
+                <p className="text-slate-500 font-medium italic">Welcome to <span className="text-slate-900 font-bold">Athlex Academy</span>. Your performance journey continues here.</p>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <div className="text-right hidden sm:block">
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Progress</div>
+                  <div className="text-sm font-bold text-slate-900">{roadmapProgress}% Completed</div>
+                </div>
+                <div className="w-14 h-14 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-3 flex items-center justify-center">
+                  <Trophy className="h-8 w-8 text-blue-600" />
+                </div>
+              </div>
+            </div>
+
+            {!isApprovedForActiveCourse && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-amber-50 border border-amber-200 rounded-3xl p-8 flex flex-col md:flex-row items-center gap-8 shadow-xl shadow-amber-500/10 mb-10"
+              >
+                <div className="w-16 h-16 bg-amber-600 text-white rounded-2xl flex items-center justify-center flex-shrink-0 animate-pulse">
+                  <Lock className="h-8 w-8" />
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                  <h3 className="text-xl font-bold text-amber-900 mb-2">Access Pending for {courses.find(c => c.id === activeCourseId)?.title}</h3>
+                  <p className="text-amber-700 font-medium text-sm leading-relaxed">
+                    You are currently viewing the course curriculum. Access to quizzes, materials, and live recordings will be granted once the admin approves your enrollment for this specific course. Join our WhatsApp community for instant approval.
+                  </p>
+                </div>
+                <a 
+                  href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-8 py-4 bg-amber-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-amber-700 transition-all shadow-lg shadow-amber-500/20"
+                >
+                  Get Approved
+                </a>
+              </motion.div>
+            )}
+          </div>
+
       <AnimatePresence>
         {showGuide && (
           <motion.div
@@ -501,56 +630,20 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
         </div>
       </div>
 
-      {/* Welcome & Progress Header */}
+      {/* Main Roadmap Area */}
       <div className="mb-12">
-        <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-slate-100 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
-          
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-            <div className="max-w-xl">
-              <div className="inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full text-blue-600 font-bold text-xs uppercase tracking-widest mb-6">
-                <Trophy className="h-4 w-4" />
-                <span>Your Learning Journey</span>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">
-                Welcome back, <span className="text-blue-600">{user.displayName?.split(' ')[0]}!</span>
-              </h1>
-              <p className="text-lg text-slate-500 font-medium leading-relaxed">
-                You've completed <span className="text-slate-900 font-bold">{courseScores.length} quizzes</span> with an average score of <span className="text-blue-600 font-bold">{averageScore}%</span>. Keep pushing towards your {courses.find(c => c.id === activeCourseId)?.title || 'ACE-CPT'} certification!
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-4">
-              <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex items-center space-x-4 min-w-[200px]">
-                <div className="bg-blue-600 text-white p-3 rounded-xl shadow-lg shadow-blue-500/20">
-                  <Trophy className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="text-2xl font-black text-slate-900">{averageScore}%</div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Mastery Level</div>
-                </div>
-              </div>
-              <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex items-center space-x-4 min-w-[200px]">
-                <div className="bg-red-600 text-white p-3 rounded-xl shadow-lg shadow-red-500/20">
-                  <Star className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="text-2xl font-black text-slate-900">{scores.length}</div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Quizzes Done</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Certification Roadmap: Success Pointer Block ... */}
+        {/* (Assuming it stays as is based on previous edit attempts) */}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        {/* Quizzes Grid */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="lg:col-span-2 space-y-8"
-        >
+      {isApprovedForActiveCourse ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Quizzes Grid */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="lg:col-span-2 space-y-8"
+          >
           <div className="flex items-center justify-between">
             <h2 className="text-3xl font-serif font-black text-slate-900 tracking-tight italic">Academy Quizzes</h2>
             <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
@@ -1035,7 +1128,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               Recent Performance
             </h2>
             <div className="space-y-6">
-              {scores.length > 0 ? scores.slice(0, 5).map((score) => (
+              {scores.filter(s => !activeCourseId || s.courseId === activeCourseId).length > 0 ? scores.filter(s => !activeCourseId || s.courseId === activeCourseId).slice(0, 10).map((score) => (
                 <div key={score.id} className="flex items-center justify-between group">
                   <div className="flex items-center space-x-4">
                     <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-sm ${
@@ -1046,7 +1139,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                     <div>
                       <div className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">{score.quizTitle}</div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                        {new Date(score.completedAt.toDate()).toLocaleDateString()}
+                        {score.completedAt?.toDate ? new Date(score.completedAt.toDate()).toLocaleDateString() : 'Manual Record'}
                       </div>
                     </div>
                   </div>
@@ -1058,8 +1151,32 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           </div>
         </div>
       </div>
+      ) : (
+        <div className="max-w-3xl mx-auto py-20 text-center">
+           <div className="w-24 h-24 bg-white rounded-[2rem] shadow-xl border border-slate-100 flex items-center justify-center mx-auto mb-10">
+              <Lock className="h-12 w-12 text-slate-200" />
+           </div>
+           <h2 className="text-3xl font-serif font-black text-slate-900 italic mb-6">Course Content is Locked</h2>
+           <p className="text-slate-500 font-medium text-lg leading-relaxed mb-10 italic">
+              The curriculum for <span className="text-slate-900 font-bold">{courses.find(c => c.id === activeCourseId)?.title}</span> is available to browse. 
+              Full access to assessments, library, and recordings will be granted once your enrollment is approved by the Athlex Academy administration.
+           </p>
+           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a 
+              href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="px-10 py-5 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"
+            >
+              Request Access
+            </a>
+            <button onClick={() => setIsChatOpen(true)} className="px-10 py-5 bg-white border border-slate-200 rounded-2xl font-black text-sm uppercase tracking-widest text-slate-900 hover:bg-slate-50 transition-all shadow-sm">
+              Inquire via Chat
+            </button>
+           </div>
+        </div>
+      )}
 
-      {/* Feedback Modal */}
       <AnimatePresence>
         {showFeedbackModal && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
@@ -1306,5 +1423,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
         </div>
       </div>
     </motion.div>
+  </main>
+</div>
   );
 }

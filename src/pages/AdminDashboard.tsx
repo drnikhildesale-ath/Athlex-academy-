@@ -52,6 +52,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   // Manual Result Form
   const [selectedStudentId, setSelectedStudentId] = React.useState('');
+  const [studentSearch, setStudentSearch] = React.useState('');
+  const [activeBatchFilter, setActiveBatchFilter] = React.useState('');
   const [resultChapter, setResultChapter] = React.useState('1');
   const [resultScore, setResultScore] = React.useState(0);
   const [resultTotal, setResultTotal] = React.useState(100);
@@ -493,7 +495,14 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   };
 
   const handleSaveFlashcards = async () => {
-    if (!flashcardTitle || !draftFlashcards || !activeCourseId) return;
+    if (!flashcardTitle || !draftFlashcards) {
+      setStatus({ type: 'error', message: "Title and flashcards are required." });
+      return;
+    }
+    if (!activeCourseId) {
+      setStatus({ type: 'error', message: "Please select a target course." });
+      return;
+    }
 
     try {
       await addDoc(collection(db, 'flashcards'), {
@@ -696,6 +705,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       handleFirestoreError(err, OperationType.UPDATE, `users/${studentId}`);
     }
   };
+
+  const handleUpdateApprovedCourses = async (studentId: string, courseIds: string[]) => {
+    try {
+      await updateDoc(doc(db, 'users', studentId), {
+        approvedCourseIds: courseIds
+      });
+      setStatus({ type: 'success', message: "Student permissions updated!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${studentId}`);
+    }
+  };
   
   const handleCreateRecording = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -778,6 +798,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             { id: 'students', label: 'Students', icon: <Users className="h-5 w-5" /> },
             { id: 'chats', label: 'Support', icon: <MessageSquare className="h-5 w-5" /> },
             { id: 'results', label: 'Results', icon: <Activity className="h-5 w-5" /> },
+            { id: 'flashcards', label: 'Flashcards', icon: <Sparkles className="h-5 w-5" /> },
             { id: 'exercises', label: 'Exercises', icon: <Dumbbell className="h-5 w-5" /> },
             { id: 'knowledge', label: 'Insights', icon: <Lightbulb className="h-5 w-5" /> },
             { id: 'announcements', label: 'Notices', icon: <Megaphone className="h-5 w-5" /> },
@@ -1699,7 +1720,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     <div className="pt-6 border-t border-slate-50 mt-6 animate-in fade-in slide-in-from-bottom-2">
                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Live Progress Preview</label>
                        {(() => {
-                         const studentScores = allScores.filter(s => s.studentId === selectedStudentId && s.courseId === activeCourseId);
+                         const studentScores = allScores.filter(s => s.studentId === selectedStudentId && (!activeCourseId || s.courseId === activeCourseId));
                          const progress = Math.min(Math.round((Array.from(new Set(studentScores.map(s => s.chapter))).filter(Boolean).length / 20) * 100), 100);
                          return (
                            <div className="space-y-3">
@@ -1816,6 +1837,21 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 </div>
 
                 <form onSubmit={handleGenerateFlashcardDraft} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Target Course</label>
+                    <select
+                      value={activeCourseId}
+                      onChange={(e) => setActiveCourseId(e.target.value)}
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    >
+                      <option value="">Select a Course...</option>
+                      {courses.map(c => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Set Title</label>
                     <input
@@ -2375,8 +2411,42 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     {students.length} Registered Students
                   </span>
                 </div>
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search students..."
+                      value={studentSearch}
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                      className="w-full pl-16 pr-6 py-4 rounded-2xl bg-white border border-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2 overflow-x-auto pb-2">
+                    {Array.from(new Set(students.map(s => s.batch).filter(Boolean))).map(batch => (
+                      <button
+                        key={batch as string}
+                        onClick={() => setActiveBatchFilter(activeBatchFilter === batch ? '' : batch as string)}
+                        className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                          activeBatchFilter === batch 
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                            : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'
+                        }`}
+                      >
+                        {batch as string}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4">
-                  {students.map((student) => (
+                  {students
+                    .filter(s => 
+                      (s.displayName?.toLowerCase().includes(studentSearch.toLowerCase()) || 
+                       s.email?.toLowerCase().includes(studentSearch.toLowerCase())) &&
+                      (!activeBatchFilter || s.batch === activeBatchFilter)
+                    )
+                    .map((student) => (
                     <div key={student.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between gap-6">
                       <div className="flex items-center space-x-4 min-w-0">
                         <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
@@ -2392,19 +2462,57 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-6 flex-1 justify-end">
+                        <div className="flex flex-col flex-1 max-w-[200px]">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Course Approvals</label>
+                          <div className="flex flex-wrap gap-2">
+                            {courses.map(course => {
+                              const isApproved = student.approvedCourseIds?.includes(course.id);
+                              return (
+                                <button
+                                  key={course.id}
+                                  onClick={() => {
+                                    const currentApproved = student.approvedCourseIds || [];
+                                    const newApproved = isApproved
+                                      ? currentApproved.filter((id: string) => id !== course.id)
+                                      : [...currentApproved, course.id];
+                                    handleUpdateApprovedCourses(student.id, newApproved);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tight transition-all border ${
+                                    isApproved 
+                                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                                      : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-blue-200'
+                                  }`}
+                                  title={course.title}
+                                >
+                                  {course.title.substring(0, 8)}...
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
                         <div className="flex flex-col">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch Assignment</label>
-                          <input 
-                            type="text"
-                            defaultValue={student.batch || ""}
-                            onBlur={(e) => handleUpdateStudentBatch(student.id, e.target.value)}
-                            placeholder="Assign to Batch..."
-                            className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                          />
-                        </div>
-                        <div className={`p-2 rounded-xl ${student.batch ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-300'}`}>
-                          <Users className="h-5 w-5" />
+                          <div className="flex space-x-2">
+                            <input 
+                              type="text"
+                              id={`batch-input-${student.id}`}
+                              defaultValue={student.batch || ""}
+                              placeholder="e.g. Batch A"
+                              className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            />
+                            <button
+                              onClick={() => {
+                                const val = (document.getElementById(`batch-input-${student.id}`) as HTMLInputElement).value;
+                                handleUpdateStudentBatch(student.id, val);
+                              }}
+                              className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-black"
+                              title="Save Batch"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2435,7 +2543,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                        </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
-                        {allScores.filter(s => s.courseId === activeCourseId).map((score) => (
+                        {allScores.filter(s => !activeCourseId || s.courseId === activeCourseId).map((score) => (
                           <tr key={score.id} className="hover:bg-slate-50/50 transition-colors group">
                             <td className="px-8 py-5">
                               <div className="font-bold text-slate-900">{score.studentEmail}</div>

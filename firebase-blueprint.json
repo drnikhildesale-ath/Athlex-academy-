@@ -11,6 +11,11 @@
         "photoURL": { "type": "string", "format": "uri" },
         "role": { "type": "string", "enum": ["admin", "student"] },
         "batch": { "type": "string", "description": "Student batch designation" },
+        "approvedCourseIds": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "List of course IDs the student is officially enrolled and approved in."
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role"]
