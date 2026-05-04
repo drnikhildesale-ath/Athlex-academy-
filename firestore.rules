@@ -52,8 +52,13 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          ((request.auth.token.email == "drnikhildesale@gmail.com" || request.auth.token.email == "athleacademy@gmail.com") && request.auth.token.email_verified == true));
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || isSuperAdmin());
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "drnikhildesale@gmail.com" || request.auth.token.email == "athlexacademy@gmail.com") && 
+        request.auth.token.email_verified == true;
     }
 
     function hasRequiredFields(fields) {
@@ -227,23 +232,30 @@ service cloud.firestore {
       return user.role == 'admin' || (user.get('approvedCourseIds', []) != null && courseId in user.get('approvedCourseIds', []));
     }
 
+    match /activityLogs/{logId} {
+      allow create: if isAdmin();
+      allow read: if isSuperAdmin();
+    }
+
     match /users/{userId} {
       // Students can only read their own profile. Admins can read all.
       allow read: if isOwner(userId) || isAdmin();
       
       // Users can create their own profile as 'student' by default.
-      // Only admins can create other admins.
+      // Only super-admins can create other admins.
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) &&
-                    (request.resource.data.role == 'student' || isAdmin());
+                    (request.resource.data.role == 'student' || isSuperAdmin());
       
       // Users can update their own profile but cannot change their role.
-      // Admins can update any profile.
+      // Admins can update any profile except changing a role.
+      // Only super-admins can change roles.
       allow update: if isAuthenticated() && 
                     ((isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin()) &&
                     (isAdmin() || !request.resource.data.keys().contains('approvedCourseIds') || request.resource.data.approvedCourseIds == resource.data.approvedCourseIds) &&
-                    (isAdmin() || !request.resource.data.keys().contains('batch') || request.resource.data.batch == resource.data.batch);
+                    (isAdmin() || !request.resource.data.keys().contains('batch') || request.resource.data.batch == resource.data.batch) &&
+                    (isSuperAdmin() || request.resource.data.role == resource.data.role);
       
-      allow delete: if isAdmin();
+      allow delete: if isSuperAdmin();
     }
 
     function isValidUserProgress(data) {

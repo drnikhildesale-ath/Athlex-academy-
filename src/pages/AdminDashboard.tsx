@@ -43,15 +43,36 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [recordings, setRecordings] = React.useState<any[]>([]);
   const [chatMessages, setChatMessages] = React.useState<any[]>([]);
   const [notifications, setNotifications] = React.useState<any[]>([]);
+  const [activityLogs, setActivityLogs] = React.useState<any[]>([]);
+  const [allUsers, setAllUsers] = React.useState<any[]>([]);
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [courses, setCourses] = React.useState<any[]>([]);
   const [activeCourseId, setActiveCourseId] = React.useState<string>('');
+  
+  const superAdminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
+  const isSuperAdmin = superAdminEmails.includes(user?.email || '');
+
+  const logAdminAction = async (action: string, targetType: string, targetId: string, details: string) => {
+    try {
+      await addDoc(collection(db, 'activityLogs'), {
+        adminId: user.uid,
+        adminName: user.displayName || user.email,
+        action,
+        targetType,
+        targetId,
+        details,
+        createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Failed to log activity:", err);
+    }
+  };
   const [courseTitle, setCourseTitle] = React.useState('');
   const [courseDescription, setCourseDescription] = React.useState('');
   const [courseTotalQuizzes, setCourseTotalQuizzes] = React.useState(16);
   const [selectedStudentForChat, setSelectedStudentForChat] = React.useState<any>(null);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses' | 'students' | 'recordings'>('quizzes');
+  const [activeTab, setActiveTab ] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses' | 'students' | 'recordings' | 'admins' | 'audit'>('quizzes');
 
   // Manual Result Form
   const [selectedStudentId, setSelectedStudentId] = React.useState('');
@@ -177,6 +198,14 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'notifications'));
 
+    const unsubscribeLogs = isSuperAdmin ? onSnapshot(query(collection(db, 'activityLogs'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setActivityLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'activityLogs')) : () => {};
+
+    const unsubscribeAllUsers = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
+
     const unsubscribeCourses = onSnapshot(query(collection(db, 'courses'), orderBy('createdAt', 'desc')), (snapshot) => {
       const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCourses(fetchedCourses);
@@ -199,6 +228,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       unsubscribeAnnouncements();
       unsubscribeChats();
       unsubscribeNotifications();
+      unsubscribeLogs();
+      unsubscribeAllUsers();
       unsubscribeCourses();
     };
   }, [activeCourseId]);
@@ -308,7 +339,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         quizData.googleFormUrl = googleFormUrl;
       }
 
-      await addDoc(collection(db, 'quizzes'), quizData);
+      const docRef = await addDoc(collection(db, 'quizzes'), quizData);
+      await logAdminAction(isDraft ? 'Save Draft' : 'Publish Quiz', 'Quiz', docRef.id, `Created ${quizTitle} for course ${activeCourseId}`);
 
       setNotes('');
       setQuizTitle('');
@@ -318,6 +350,27 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setStatus({ type: 'success', message: `Successfully ${isDraft ? 'saved' : 'published'} "${quizTitle}"!` });
     } catch (err: any) {
       handleFirestoreError(err, OperationType.CREATE, 'quizzes');
+    }
+  };
+
+  const handleUpdateUserRole = async (targetId: string, newRole: 'admin' | 'student') => {
+    if (!isSuperAdmin) {
+      setStatus({ type: 'error', message: "Only super-admins can manage roles." });
+      return;
+    }
+
+    const targetUser = allUsers.find(u => u.id === targetId);
+    if (superAdminEmails.includes(targetUser?.email)) {
+      setStatus({ type: 'error', message: "Cannot change role of a super-admin." });
+      return;
+    }
+    
+    try {
+      await updateDoc(doc(db, 'users', targetId), { role: newRole });
+      await logAdminAction('Update Role', 'User', targetId, `Changed ${targetUser?.email} role to ${newRole}`);
+      setStatus({ type: 'success', message: `User role updated to ${newRole}!` });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${targetId}`);
     }
   };
 
@@ -337,7 +390,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (materialType === 'drive' && !driveUrl) return;
 
     try {
-      await addDoc(collection(db, 'materials'), {
+      const docRef = await addDoc(collection(db, 'materials'), {
         title: materialTitle,
         chapter: materialChapter,
         courseId: activeCourseId,
@@ -348,6 +401,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         createdAt: serverTimestamp(),
         createdBy: user.uid
       });
+      await logAdminAction('Add Material', 'Material', docRef.id, `Created ${materialType} material "${materialTitle}"`);
       setMaterialTitle('');
       setMaterialFile(null);
       setDriveUrl('');
@@ -362,7 +416,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (!liveClassTitle || !liveClassLink || !activeCourseId) return;
 
     try {
-      await addDoc(collection(db, 'liveClasses'), {
+      const docRef = await addDoc(collection(db, 'liveClasses'), {
         title: liveClassTitle,
         courseId: activeCourseId,
         link: liveClassLink,
@@ -372,6 +426,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         createdAt: serverTimestamp(),
         createdBy: user.uid
       });
+      await logAdminAction('Schedule Live Class', 'LiveClass', docRef.id, `Scheduled class "${liveClassTitle}"`);
       setLiveClassTitle('');
       setLiveClassLink('');
       setLiveClassRecordingLink('');
@@ -387,7 +442,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (!storyTitle || !storyStudent || !storyThumbnail || !storyVideoUrl) return;
 
     try {
-      await addDoc(collection(db, 'successStories'), {
+      const docRef = await addDoc(collection(db, 'successStories'), {
         title: storyTitle,
         student: storyStudent,
         thumbnail: storyThumbnail,
@@ -395,6 +450,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         order: storyOrder,
         createdAt: serverTimestamp()
       });
+      await logAdminAction('Add Success Story', 'SuccessStory', docRef.id, `Added story for ${storyStudent}`);
       setStoryTitle('');
       setStoryStudent('');
       setStoryThumbnail('');
@@ -454,6 +510,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (window.confirm("Are you sure you want to delete this quiz? This action cannot be undone.")) {
       try {
         await deleteDoc(doc(db, 'quizzes', id));
+        await logAdminAction('Delete Quiz', 'Quiz', id, `Removed quiz`);
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `quizzes/${id}`);
       }
@@ -464,6 +521,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (window.confirm("Delete this inquiry?")) {
       try {
         await deleteDoc(doc(db, 'inquiries', id));
+        await logAdminAction('Delete Inquiry', 'Inquiry', id, `Removed lead inquiry`);
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `inquiries/${id}`);
       }
@@ -474,6 +532,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (window.confirm("Delete this success story?")) {
       try {
         await deleteDoc(doc(db, 'successStories', id));
+        await logAdminAction('Delete Story', 'SuccessStory', id, `Removed student story`);
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `successStories/${id}`);
       }
@@ -758,7 +817,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
 
     try {
-      await addDoc(collection(db, 'classRecordings'), {
+      const docRef = await addDoc(collection(db, 'classRecordings'), {
         title: recordingTitle,
         description: recordingDescription,
         chapter: recordingChapter,
@@ -767,6 +826,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         createdAt: serverTimestamp(),
         createdBy: user.uid
       });
+      await logAdminAction('Add Recording', 'Recording', docRef.id, `Added recording "${recordingTitle}" to course ${activeCourseId}`);
       setRecordingTitle('');
       setRecordingDescription('');
       setRecordingVideoUrl('');
@@ -780,12 +840,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     e.preventDefault();
     if (!courseTitle) return;
     try {
-      await addDoc(collection(db, 'courses'), {
+      const docRef = await addDoc(collection(db, 'courses'), {
         title: courseTitle,
         description: courseDescription,
         totalQuizzes: isNaN(courseTotalQuizzes) ? 0 : courseTotalQuizzes,
         createdAt: serverTimestamp()
       });
+      await logAdminAction('Create Course', 'Course', docRef.id, `Created course "${courseTitle}"`);
       setCourseTitle('');
       setCourseDescription('');
       setCourseTotalQuizzes(16);
@@ -849,8 +910,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             { id: 'knowledge', label: 'Insights', icon: <Lightbulb className="h-5 w-5" /> },
             { id: 'announcements', label: 'Notices', icon: <Megaphone className="h-5 w-5" /> },
             { id: 'stories', label: 'Hall of Fame', icon: <Award className="h-5 w-5" /> },
-            { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-5 w-5" /> }
-          ].map((tab) => (
+            { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-5 w-5" /> },
+            ...(isSuperAdmin ? [
+              { id: 'admins', label: 'Admin Access', icon: <Users className="h-5 w-5" /> },
+              { id: 'audit', label: 'Audit Logs', icon: <Clock className="h-5 w-5" /> }
+            ] : [])
+          ].map((tab: any) => (
             <button
               key={tab.id}
               onClick={() => {
@@ -2130,6 +2195,108 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     <div className="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                       <p className="text-slate-400 font-medium">No inquiries yet.</p>
                     </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'admins' && isSuperAdmin && (
+              <div className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight italic font-serif">Admin Management</h2>
+                  <p className="text-sm font-medium text-slate-400 italic">Promote trusted users to help manage the academy.</p>
+                </div>
+
+                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">User</th>
+                        <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Role</th>
+                        <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {allUsers.map((u) => (
+                        <tr key={u.id} className="hover:bg-slate-50/30 transition-colors">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-black text-xs uppercase">
+                                {u.displayName?.substring(0, 2) || u.email?.substring(0, 2)}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900">{u.displayName || 'No Name'}</div>
+                                <div className="text-xs text-slate-400 font-medium truncate max-w-[200px]">{u.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 font-bold">
+                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                              u.role === 'admin' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400'
+                            }`}>
+                              {u.role}
+                            </span>
+                            {superAdminEmails.includes(u.email) && (
+                              <span className="ml-2 px-3 py-1 bg-yellow-100 text-yellow-600 text-[8px] font-black uppercase tracking-widest rounded-md">Owner</span>
+                            )}
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            {!superAdminEmails.includes(u.email) && (
+                              <button
+                                onClick={() => handleUpdateUserRole(u.id, u.role === 'admin' ? 'student' : 'admin')}
+                                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                  u.role === 'admin' 
+                                    ? 'text-red-500 hover:bg-red-50' 
+                                    : 'text-blue-600 hover:bg-blue-50'
+                                }`}
+                              >
+                                {u.role === 'admin' ? 'Revoke Access' : 'Grant Admin'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'audit' && isSuperAdmin && (
+              <div className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight italic font-serif">Security Audit Logs</h2>
+                  <p className="text-sm font-medium text-slate-400 italic">Detailed history of all admin interventions.</p>
+                </div>
+
+                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm divide-y divide-slate-50">
+                  {activityLogs.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <Clock className="h-12 w-12 text-slate-100 mx-auto mb-4" />
+                      <p className="text-slate-400 font-medium">No activity recorded yet.</p>
+                    </div>
+                  ) : (
+                    activityLogs.map((log) => (
+                      <div key={log.id} className="p-8 hover:bg-slate-50/50 transition-colors flex items-start justify-between">
+                        <div className="flex items-start space-x-6">
+                          <div className="bg-slate-100 p-4 rounded-2xl">
+                            <Activity className="h-5 w-5 text-slate-400" />
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-3 mb-1">
+                              <span className="font-black text-slate-900 text-sm uppercase tracking-wide">{log.adminName}</span>
+                              <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest rounded-full">{log.action}</span>
+                            </div>
+                            <div className="text-sm text-slate-500 font-medium mb-2">{log.details}</div>
+                            <div className="flex items-center space-x-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                              <span className="flex items-center"><Calendar className="h-3 w-3 mr-1" /> {log.createdAt?.toDate().toLocaleDateString()}</span>
+                              <span className="flex items-center"><Clock className="h-3 w-3 mr-1" /> {log.createdAt?.toDate().toLocaleTimeString()}</span>
+                              <span>Target: {log.targetType} ({log.targetId})</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>

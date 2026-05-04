@@ -46,7 +46,7 @@ export default function App() {
                   email: firebaseUser.email,
                   displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
                   photoURL: firebaseUser.photoURL || '',
-                  role: ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'].includes(firebaseUser.email || '') ? 'admin' : 'student',
+                  role: ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'].includes(firebaseUser.email || '') ? 'admin' : 'student',
                   createdAt: serverTimestamp(),
                   lastLogin: serverTimestamp()
                 };
@@ -70,7 +70,7 @@ export default function App() {
                 }
               } else {
                 const userData = userSnap.data();
-                const adminEmails = ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'];
+                const adminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
                 const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
                 
                 // Update last login
@@ -108,7 +108,7 @@ export default function App() {
           console.error("Auth State Error:", error);
           // Fallback: allow app to load even if Firestore check fails
           setUser(firebaseUser ? { uid: firebaseUser.uid, email: firebaseUser.email } : null);
-          setIsAdmin(!!firebaseUser?.email && ['drnikhildesale@gmail.com', 'athleacademy@gmail.com'].includes(firebaseUser.email));
+          setIsAdmin(!!firebaseUser?.email && ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'].includes(firebaseUser.email));
           setLoading(false);
         }
       });
