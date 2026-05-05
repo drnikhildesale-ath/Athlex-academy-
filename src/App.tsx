@@ -1,7 +1,7 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Layout from './components/Layout';
@@ -23,38 +23,40 @@ export default function App() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    let unsubscribeUser: (() => void) | null = null;
+    
     try {
       console.log("App useEffect running...");
-      // Safety timeout: force loading to false after 5 seconds
-      const safetyTimeout = setTimeout(() => {
-        if (loading) {
-          console.warn("Auth state taking too long, forcing load...");
-          setLoading(false);
-        }
-      }, 5000);
-
+      
       const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-        clearTimeout(safetyTimeout);
+        // Clean up previous user snapshot if it exists
+        if (unsubscribeUser) {
+          unsubscribeUser();
+          unsubscribeUser = null;
+        }
+
         try {
           if (firebaseUser) {
+            console.log("Firebase user detected:", firebaseUser.uid);
             // Listen for user profile changes
             const userRef = doc(db, 'users', firebaseUser.uid);
-            const unsubscribeUser = onSnapshot(userRef, async (userSnap) => {
-              if (!userSnap.exists()) {
-                const newUser = {
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email,
-                  displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
-                  photoURL: firebaseUser.photoURL || '',
-                  role: ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'].includes(firebaseUser.email || '') ? 'admin' : 'student',
-                  createdAt: serverTimestamp(),
-                  lastLogin: serverTimestamp()
-                };
-                
-                try {
+            
+            unsubscribeUser = onSnapshot(userRef, async (userSnap) => {
+              try {
+                if (!userSnap.exists()) {
+                  console.log("User doc doesn't exist, creating...");
+                  const newUser = {
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student',
+                    photoURL: firebaseUser.photoURL || '',
+                    role: ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'].includes(firebaseUser.email || '') ? 'admin' : 'student',
+                    createdAt: serverTimestamp(),
+                    lastLogin: serverTimestamp()
+                  };
+                  
                   await setDoc(userRef, newUser);
                   
-                  // Notify admin about new student
                   if (newUser.role === 'student') {
                     await addDoc(collection(db, 'notifications'), {
                       type: 'new_student',
@@ -65,57 +67,56 @@ export default function App() {
                       read: false
                     });
                   }
-                } catch (err) {
-                  handleFirestoreError(err, OperationType.CREATE, `users/${firebaseUser.uid}`);
-                }
-              } else {
-                const userData = userSnap.data();
-                const adminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
-                const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
-                
-                // Update last login
-                try {
-                  await updateDoc(userRef, { lastLogin: serverTimestamp() });
-                } catch (err) {
-                  // Ignore last login update errors to not block the app
-                }
-                
-                // Auto-fix: If user has admin email but is marked as student, update Firestore
-                if (isAdminEmail && (userData as any).role !== 'admin') {
-                  try {
-                    await setDoc(userRef, { role: 'admin' }, { merge: true });
-                  } catch (err) {
-                    handleFirestoreError(err, OperationType.UPDATE, `users/${firebaseUser.uid}`);
+                  // loading will be set to false by the next snapshot trigger
+                } else {
+                  const userData = userSnap.data();
+                  console.log("User data loaded:", userData.role);
+                  const adminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
+                  const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
+                  
+                  // Update last login (fire and forget)
+                  updateDoc(userRef, { lastLogin: serverTimestamp() }).catch(() => {});
+                  
+                  // Auto-fix admin roles
+                  if (isAdminEmail && (userData as any).role !== 'admin') {
+                    setDoc(userRef, { role: 'admin' }, { merge: true }).catch(() => {});
                   }
+                  
+                  setUser(userData);
+                  setIsAdmin((userData as any).role === 'admin' || isAdminEmail);
+                  setLoading(false);
                 }
-                
-                setUser(userData);
-                setIsAdmin((userData as any).role === 'admin' || isAdminEmail);
+              } catch (snapErr) {
+                console.error("Snapshot callback error:", snapErr);
                 setLoading(false);
               }
             }, (err) => {
-              handleFirestoreError(err, OperationType.LIST, `users/${firebaseUser.uid}`);
+              console.error("Snapshot error listener caught:", err);
+              try {
+                handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
+              } catch (e) {
+                // Ignore throw to allow app to finish loading
+              }
               setLoading(false);
             });
-
-            return () => unsubscribeUser();
           } else {
+            console.log("No firebase user.");
             setUser(null);
             setIsAdmin(false);
             setLoading(false);
           }
-        } catch (error) {
-          console.error("Auth State Error:", error);
-          // Fallback: allow app to load even if Firestore check fails
-          setUser(firebaseUser ? { uid: firebaseUser.uid, email: firebaseUser.email } : null);
-          setIsAdmin(!!firebaseUser?.email && ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'].includes(firebaseUser.email));
+        } catch (authCallbackError) {
+          console.error("Auth callback error:", authCallbackError);
           setLoading(false);
         }
       });
 
-      return () => unsubscribeAuth();
+      return () => {
+        unsubscribeAuth();
+        if (unsubscribeUser) unsubscribeUser();
+      };
     } catch (e) {
-      console.error("App useEffect crashed:", e);
+      console.error("App useEffect setup crashed:", e);
       setLoading(false);
     }
   }, []);

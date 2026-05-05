@@ -51,7 +51,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [activeCourseId, setActiveCourseId] = React.useState<string>('');
   
   const [newBatchName, setNewBatchName] = React.useState('');
-  const [isManagingBatches, setIsManagingBatches] = React.useState(false);
 
   const superAdminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
   const isSuperAdmin = superAdminEmails.includes(user?.email || '');
@@ -76,7 +75,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [courseTotalQuizzes, setCourseTotalQuizzes] = React.useState(16);
   const [selectedStudentForChat, setSelectedStudentForChat] = React.useState<any>(null);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab ] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses' | 'students' | 'recordings' | 'admins' | 'audit'>('quizzes');
+  const [activeTab, setActiveTab ] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses' | 'students' | 'recordings' | 'batches' | 'admins' | 'audit'>('quizzes');
 
   // Manual Result Form
   const [selectedStudentId, setSelectedStudentId] = React.useState('');
@@ -959,6 +958,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             { id: 'liveClasses', label: 'Live Events', icon: <Video className="h-5 w-5" /> },
             { id: 'recordings', label: 'Recordings', icon: <PlayCircle className="h-5 w-5" /> },
             { id: 'students', label: 'Students', icon: <Users className="h-5 w-5" /> },
+            { id: 'batches', label: 'Batches', icon: <Users className="h-5 w-5" /> },
             { id: 'chats', label: 'Support', icon: <MessageSquare className="h-5 w-5" /> },
             { id: 'results', label: 'Results', icon: <Activity className="h-5 w-5" /> },
             { id: 'flashcards', label: 'Flashcards', icon: <Sparkles className="h-5 w-5" /> },
@@ -1122,74 +1122,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         </div>
       </header>
 
-      {/* Batch Management Modal */}
-      <AnimatePresence>
-        {isManagingBatches && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsManagingBatches(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden"
-            >
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-slate-900 tracking-tight">Batch Management</h3>
-                  <button onClick={() => setIsManagingBatches(false)} className="p-2 hover:bg-slate-100 rounded-xl">
-                    <X className="h-5 w-5 text-slate-400" />
-                  </button>
-                </div>
 
-                <form onSubmit={handleCreateBatch} className="flex space-x-2 mb-8">
-                  <input
-                    type="text"
-                    value={newBatchName}
-                    onChange={(e) => setNewBatchName(e.target.value)}
-                    placeholder="Enter new batch name..."
-                    className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-medium"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all"
-                  >
-                    Add
-                  </button>
-                </form>
-
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Batches</p>
-                  {batches.length === 0 ? (
-                    <p className="text-center py-8 text-slate-400 text-sm">No batches created yet.</p>
-                  ) : (
-                    batches.map((batch) => (
-                      <div key={batch.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl group transition-all hover:bg-slate-100">
-                        <span className="font-bold text-slate-700">{batch.name}</span>
-                        <button
-                          onClick={() => handleDeleteBatch(batch.id, batch.name)}
-                          className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-              <div className="bg-slate-50 p-6 text-center">
-                <p className="text-[10px] text-slate-400 font-bold italic">Changing batch names here will not affect existing student records already assigned to them.</p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
         {showReview && draftQuiz ? (
         <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl mb-12 animate-in fade-in slide-in-from-bottom-4">
@@ -1267,6 +1200,47 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Generator Form Column */}
           <div className="lg:col-span-1">
+            {activeTab === 'batches' && (
+              <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-blue-50 p-3 rounded-2xl">
+                    <Users className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Create Student Batch</h2>
+                </div>
+
+                <form onSubmit={handleCreateBatch} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Batch Name</label>
+                    <input
+                      type="text"
+                      value={newBatchName}
+                      onChange={(e) => setNewBatchName(e.target.value)}
+                      placeholder="e.g. May 2026 Morning"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      required
+                    />
+                  </div>
+
+                  {status && activeTab === 'batches' && (
+                    <div className={`p-4 rounded-2xl flex items-center space-x-3 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
+                      status.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                    }`}>
+                      {status.type === 'success' ? <CheckCircle2 className="h-5 w-5 flex-shrink-0" /> : <AlertCircle className="h-5 w-5 flex-shrink-0" />}
+                      <span>{status.message}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"
+                  >
+                    Create Batch
+                  </button>
+                </form>
+              </div>
+            )}
+
             {activeTab === 'courses' && (
               <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
                 <div className="flex items-center space-x-3 mb-8">
@@ -1963,7 +1937,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         Target Batch (Optional)
                         <button 
                           type="button" 
-                          onClick={() => setIsManagingBatches(true)}
+                          onClick={() => setActiveTab('batches')}
                           className="text-[8px] text-blue-600 hover:underline"
                         >
                           + Manage Batches
@@ -2571,6 +2545,61 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
           {/* Content List Column */}
           <div className="lg:col-span-2 space-y-8">
+            {activeTab === 'batches' && (
+              <div className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Management Suite</h2>
+                  <span className="text-sm font-bold text-slate-400 bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    {batches.length} Active Batches
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {batches.map((batch) => {
+                    const studentCount = students.filter(s => s.batch === batch.name).length;
+                    return (
+                      <div key={batch.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm group hover:shadow-xl hover:shadow-blue-500/5 transition-all">
+                        <div className="flex justify-between items-start mb-6">
+                          <div className="bg-blue-50 p-3 rounded-2xl">
+                            <Users className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <button 
+                            onClick={() => handleDeleteBatch(batch.id, batch.name)}
+                            className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">{batch.name}</h3>
+                        <div className="flex items-center space-x-2 text-sm font-bold text-blue-600 mb-6">
+                          <Users className="h-4 w-4" />
+                          <span>{studentCount} Students Assigned</span>
+                        </div>
+                        
+                        <div className="pt-6 border-t border-slate-50">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Quick Batch Filter</p>
+                          <button 
+                            onClick={() => {
+                              setActiveTab('students');
+                              setActiveBatchFilter(batch.name);
+                            }}
+                            className="w-full py-3 rounded-xl bg-slate-50 text-slate-600 font-bold text-xs hover:bg-blue-50 hover:text-blue-600 transition-all"
+                          >
+                            View Students in this Batch
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {batches.length === 0 && (
+                    <div className="col-span-full py-20 text-center bg-slate-50 rounded-[3rem] border border-dashed border-slate-200">
+                      <Users className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                      <p className="text-slate-400 font-medium italic">No batches found. Create your first batch on the left.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {activeTab === 'courses' && (
               <div className="space-y-8">
                 <div className="flex items-center justify-between">
@@ -2945,7 +2974,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   </div>
                   <div className="flex items-center space-x-2 overflow-x-auto pb-2">
                     <button
-                      onClick={() => setIsManagingBatches(true)}
+                      onClick={() => setActiveTab('batches')}
                       className="px-4 py-2 rounded-xl border border-blue-100 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap hover:bg-blue-100"
                     >
                       <Plus className="h-3 w-3 inline mr-1" /> Manage
@@ -3041,7 +3070,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-between">
                             Batch Assignment
                             <button 
-                              onClick={() => setIsManagingBatches(true)}
+                              onClick={() => setActiveTab('batches')}
                               className="text-[8px] text-blue-600 hover:underline"
                             >
                               + Edit
