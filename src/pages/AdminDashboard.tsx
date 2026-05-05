@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc, updateDoc, limit, limitToLast } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc, updateDoc, limit, limitToLast, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
-import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X, Award, Search } from 'lucide-react';
+import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X, Award, Search, LayoutDashboard, Layout } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -75,7 +75,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [courseTotalQuizzes, setCourseTotalQuizzes] = React.useState(16);
   const [selectedStudentForChat, setSelectedStudentForChat] = React.useState<any>(null);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab ] = React.useState<'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses' | 'students' | 'recordings' | 'batches' | 'admins' | 'audit'>('quizzes');
+  const [activeTab, setActiveTab ] = React.useState<'overview' | 'quizzes' | 'materials' | 'liveClasses' | 'inquiries' | 'stories' | 'flashcards' | 'exercises' | 'knowledge' | 'announcements' | 'chats' | 'results' | 'courses' | 'students' | 'recordings' | 'batches' | 'admins' | 'audit'>('overview');
 
   // Manual Result Form
   const [selectedStudentId, setSelectedStudentId] = React.useState('');
@@ -152,15 +152,30 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setQuizzes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'quizzes'));
 
-    // Fetch students (limited to 200)
-    const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'), limit(200));
-    const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
-      setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
+    // Static/Low-frequency Data: Fetch once to save quota
+    const fetchStaticData = async () => {
+      try {
+        const [materialsSnap, storiesSnap, usersSnap, batchesSnap, allUsersSnap] = await Promise.all([
+          getDocs(query(collection(db, 'materials'), orderBy('createdAt', 'desc'), limit(100))),
+          getDocs(query(collection(db, 'successStories'), orderBy('order', 'asc'))),
+          getDocs(query(collection(db, 'users'), where('role', '==', 'student'), limit(200))),
+          getDocs(query(collection(db, 'batches'), orderBy('name', 'asc'))),
+          getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)))
+        ]);
 
-    const unsubscribeMaterials = onSnapshot(query(collection(db, 'materials'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'materials'));
+        setMaterials(materialsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setSuccessStories(storiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setStudents(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setBatches(batchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setAllUsers(allUsersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        if (err instanceof Error && !err.message.includes('Quota exceeded')) {
+          console.error("Error fetching static admin data:", err);
+        }
+      }
+    };
+
+    fetchStaticData();
 
     const unsubscribeLiveClasses = onSnapshot(query(collection(db, 'liveClasses'), orderBy('createdAt', 'desc')), (snapshot) => {
       setLiveClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -217,6 +232,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setBatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'batches'));
 
+    // Courses fetch
     const unsubscribeCourses = onSnapshot(query(collection(db, 'courses'), orderBy('createdAt', 'desc')), (snapshot) => {
       const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCourses(fetchedCourses);
@@ -224,7 +240,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         if (!activeCourseId) {
           setActiveCourseId(fetchedCourses[0].id);
         }
-        // Set default course for announcement form if not set
         if (!announcementCourseId) {
           setAnnouncementCourseId(activeCourseId || fetchedCourses[0].id);
         }
@@ -233,12 +248,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
     return () => {
       unsubscribeQuizzes();
-      unsubscribeStudents();
-      unsubscribeMaterials();
       unsubscribeLiveClasses();
       unsubscribeRecordings();
       unsubscribeInquiries();
-      unsubscribeStories();
       unsubscribeFlashcards();
       unsubscribeExercises();
       unsubscribeKnowledge();
@@ -246,11 +258,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       unsubscribeChats();
       unsubscribeNotifications();
       unsubscribeLogs();
-      unsubscribeAllUsers();
-      unsubscribeBatches();
       unsubscribeCourses();
     };
-  }, [activeCourseId]);
+  }, [user?.uid, isSuperAdmin]); // Removed activeCourseId to prevent loops
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -955,45 +965,89 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           </div>
         </div>
 
-        <nav className="space-y-1 relative z-10">
-          {[
-            { id: 'courses', label: 'Curriculum', icon: <BookCheck className="h-5 w-5" /> },
-            { id: 'quizzes', label: 'Assessments', icon: <Sparkles className="h-5 w-5" /> },
-            { id: 'materials', label: 'Library', icon: <FileText className="h-5 w-5" /> },
-            { id: 'liveClasses', label: 'Live Events', icon: <Video className="h-5 w-5" /> },
-            { id: 'recordings', label: 'Recordings', icon: <PlayCircle className="h-5 w-5" /> },
-            { id: 'students', label: 'Students', icon: <Users className="h-5 w-5" /> },
-            { id: 'batches', label: 'Batches', icon: <Users className="h-5 w-5" /> },
-            { id: 'chats', label: 'Support', icon: <MessageSquare className="h-5 w-5" /> },
-            { id: 'results', label: 'Results', icon: <Activity className="h-5 w-5" /> },
-            { id: 'flashcards', label: 'Flashcards', icon: <Sparkles className="h-5 w-5" /> },
-            { id: 'exercises', label: 'Exercises', icon: <Dumbbell className="h-5 w-5" /> },
-            { id: 'knowledge', label: 'Insights', icon: <Lightbulb className="h-5 w-5" /> },
-            { id: 'announcements', label: 'Notices', icon: <Megaphone className="h-5 w-5" /> },
-            { id: 'stories', label: 'Hall of Fame', icon: <Award className="h-5 w-5" /> },
-            { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-5 w-5" /> },
-            ...(isSuperAdmin ? [
-              { id: 'admins', label: 'Admin Access', icon: <Users className="h-5 w-5" /> },
-              { id: 'audit', label: 'Audit Logs', icon: <Clock className="h-5 w-5" /> }
-            ] : [])
-          ].map((tab: any) => (
+        <nav className="space-y-6 relative z-10">
+          <div>
             <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id as any);
-                setStatus(null);
-              }}
+              onClick={() => setActiveTab('overview')}
               className={`w-full flex items-center space-x-4 px-6 py-4 rounded-2xl font-bold text-sm transition-all group ${
-                activeTab === tab.id 
+                activeTab === 'overview' 
                   ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/20 translate-x-2' 
                   : 'text-slate-400 hover:bg-white/5 active:scale-95'
               }`}
             >
-              <span className={`transition-transform duration-300 ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`}>
-                {tab.icon}
-              </span>
-              <span className="font-serif italic text-sm">{tab.label}</span>
+              <LayoutDashboard className={`h-5 w-5 transition-transform duration-300 ${activeTab === 'overview' ? 'scale-110' : 'group-hover:scale-110'}`} />
+              <span className="font-serif italic text-sm">Dashboard Overview</span>
             </button>
+          </div>
+
+          {[
+            {
+              title: 'Academic',
+              items: [
+                { id: 'courses', label: 'Curriculum', icon: <BookCheck className="h-4 w-4" /> },
+                { id: 'batches', label: 'Batches', icon: <Layout className="h-4 w-4" /> },
+                { id: 'students', label: 'Students', icon: <Users className="h-4 w-4" /> },
+                { id: 'results', label: 'Results', icon: <Activity className="h-4 w-4" /> },
+              ]
+            },
+            {
+              title: 'Content',
+              items: [
+                { id: 'quizzes', label: 'Assessments', icon: <Sparkles className="h-4 w-4" /> },
+                { id: 'materials', label: 'PDF Library', icon: <FileText className="h-4 w-4" /> },
+                { id: 'flashcards', label: 'Flashcards', icon: <Plus className="h-4 w-4" /> },
+                { id: 'recordings', label: 'Recordings', icon: <PlayCircle className="h-4 w-4" /> },
+              ]
+            },
+            {
+              title: 'Engagement',
+              items: [
+                { id: 'announcements', label: 'Notices', icon: <Megaphone className="h-4 w-4" /> },
+                { id: 'liveClasses', label: 'Live Events', icon: <Video className="h-4 w-4" /> },
+                { id: 'chats', label: 'Support Chat', icon: <MessageSquare className="h-4 w-4" /> },
+                { id: 'inquiries', label: 'Inquiries', icon: <Mail className="h-4 w-4" /> },
+              ]
+            },
+            {
+              title: 'Resources',
+              items: [
+                { id: 'knowledge', label: 'Insights', icon: <Lightbulb className="h-4 w-4" /> },
+                { id: 'exercises', label: 'Exercises', icon: <Dumbbell className="h-4 w-4" /> },
+                { id: 'stories', label: 'Hall of Fame', icon: <Award className="h-4 w-4" /> },
+              ]
+            },
+            ...(isSuperAdmin ? [{
+              title: 'System',
+              items: [
+                { id: 'admins', label: 'Admin Access', icon: <Users className="h-4 w-4" /> },
+                { id: 'audit', label: 'Audit Logs', icon: <Clock className="h-4 w-4" /> }
+              ]
+            }] : [])
+          ].map((section) => (
+            <div key={section.title} className="space-y-2">
+              <h3 className="px-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{section.title}</h3>
+              <div className="space-y-1">
+                {section.items.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id as any);
+                      setStatus(null);
+                    }}
+                    className={`w-full flex items-center space-x-3 px-6 py-3 rounded-xl font-bold text-xs transition-all group ${
+                      activeTab === tab.id 
+                        ? 'bg-white/10 text-white shadow-lg shadow-black/10' 
+                        : 'text-slate-500 hover:bg-white/5 active:scale-95'
+                    }`}
+                  >
+                    <span className={`transition-transform duration-300 ${activeTab === tab.id ? 'scale-110 text-blue-400' : 'group-hover:scale-110 text-slate-600'}`}>
+                      {tab.icon}
+                    </span>
+                    <span className="font-serif italic">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 
@@ -1018,25 +1072,35 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-6 md:p-12 lg:p-16 overflow-y-auto">
-        <header className="mb-16">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <main className="flex-1 p-6 md:p-10 lg:p-12 overflow-y-auto bg-white/50 backdrop-blur-sm">
+        <header className="mb-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-100 pb-8">
             <div>
-              <h1 className="text-4xl lg:text-5xl font-black font-serif text-slate-900 tracking-tight italic mb-3">
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/([A-Z])/g, ' $1')}
+              <div className="flex items-center space-x-2 text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">
+                <LayoutDashboard className="h-3 w-3" />
+                <span>Operational Control</span>
+              </div>
+              <h1 className="text-3xl font-black font-serif text-slate-900 tracking-tight italic">
+                {activeTab === 'overview' ? 'Command Center' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/([A-Z])/g, ' $1')}
               </h1>
-              <p className="text-slate-500 font-medium italic">Academy command suite and content management.</p>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1 opacity-60">Manage your academy curriculum and student growth</p>
             </div>
             
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-4">
+              {/* User Identity */}
+              <div className="hidden lg:flex flex-col items-end mr-4">
+                <span className="text-sm font-black text-slate-900 leading-none mb-1">{user?.displayName || 'Administrator'}</span>
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{isSuperAdmin ? 'Super Admin' : 'Admin'}</span>
+              </div>
+
               <div className="relative">
                 <button 
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-blue-600 hover:shadow-md transition-all relative"
+                  className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-blue-600 hover:shadow-lg transition-all relative"
                 >
-                  <Megaphone className="h-6 w-6" />
+                  <Megaphone className="h-5 w-5" />
                   {notifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-lg shadow-red-500/20">
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-lg shadow-red-500/20">
                       {notifications.length}
                     </span>
                   )}
@@ -1199,6 +1263,147 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 <div className="text-slate-600 text-sm font-medium">{card.back}</div>
               </div>
             ))}
+          </div>
+        </div>
+      ) : activeTab === 'overview' ? (
+        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* Overview Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { label: 'Total Students', value: students.length, icon: <Users />, color: 'bg-blue-600' },
+              { label: 'Active Courses', value: courses.length, icon: <Globe />, color: 'bg-indigo-600' },
+              { label: 'Quizzes Created', value: quizzes.length, icon: <Sparkles />, color: 'bg-purple-600' },
+              { label: 'Total Inquiries', value: inquiries.length, icon: <Mail />, color: 'bg-orange-600' },
+            ].map((stat, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 flex items-center space-x-6 group hover:shadow-2xl transition-all"
+              >
+                <div className={`${stat.color} p-4 rounded-2xl text-white shadow-lg shadow-black/5 group-hover:scale-110 transition-transform flex items-center justify-center`}>
+                  {React.cloneElement(stat.icon as React.ReactElement<any>, { className: 'h-6 w-6' })}
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</div>
+                  <div className="text-3xl font-black text-slate-900 leading-none">{stat.value}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+            <div className="lg:col-span-2 space-y-12">
+              <section>
+                <header className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center space-x-3">
+                    <Sparkles className="h-6 w-6 text-blue-600" />
+                    <span>Instant Actions</span>
+                  </h2>
+                </header>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { id: 'quizzes', title: 'Create Quiz', desc: 'Generate MCQ from your notes or PDF documents using AI.', icon: <Sparkles />, color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { id: 'announcements', title: 'Post Notice', desc: 'Broadcast important updates to your student batches.', icon: <Megaphone />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { id: 'liveClasses', title: 'Start Event', desc: 'Schedule and share links for upcoming live classes.', icon: <Video />, color: 'text-purple-600', bg: 'bg-purple-50' },
+                    { id: 'results', title: 'Post Results', desc: 'Upload and manage student performance reports.', icon: <Activity />, color: 'text-orange-600', bg: 'bg-orange-50' },
+                  ].map((action, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveTab(action.id as any)}
+                      className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all text-left flex flex-col h-full group"
+                    >
+                      <div className={`${action.bg} ${action.color} p-3 rounded-xl self-start mb-6 flex items-center justify-center`}>
+                        {React.cloneElement(action.icon as React.ReactElement<any>, { className: 'h-5 w-5' })}
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{action.title}</h4>
+                      <p className="text-sm font-medium text-slate-500 italic flex-1">{action.desc}</p>
+                      <div className="mt-8 flex items-center text-xs font-black text-blue-600 uppercase tracking-widest bg-blue-50 py-2 px-4 rounded-lg self-start">
+                        Open Feature <Plus className="h-3 w-3 ml-2" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {isSuperAdmin && (
+                <section>
+                  <header className="flex items-center justify-between mb-8">
+                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center space-x-3">
+                      <Clock className="h-6 w-6 text-slate-400" />
+                      <span>Security Audit Log</span>
+                    </h2>
+                    <button onClick={() => setActiveTab('audit')} className="text-xs font-black text-blue-600 uppercase tracking-widest hover:underline italic">View All Logs</button>
+                  </header>
+                  <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-xl shadow-slate-200/50">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-slate-50/50 border-b border-slate-100 text-left">
+                            <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Administrator</th>
+                            <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Action Details</th>
+                            <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timestamp</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {activityLogs.slice(0, 5).map((log) => (
+                            <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-8 py-6">
+                                <div className="text-sm font-bold text-slate-900">{log.adminName}</div>
+                              </td>
+                              <td className="px-8 py-6">
+                                <span className="text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1 rounded-full">{log.action} {log.targetType}</span>
+                              </td>
+                              <td className="px-8 py-6 text-[10px] font-black text-slate-400">
+                                {log.createdAt?.toDate().toLocaleTimeString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+              )}
+            </div>
+
+            <div className="space-y-12">
+              <section>
+                <header className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center space-x-3">
+                    <Users className="h-6 w-6 text-indigo-600" />
+                    <span>Recent Students</span>
+                  </h2>
+                  <button onClick={() => setActiveTab('students')} className="text-xs font-black text-blue-600 uppercase tracking-widest hover:underline italic">Directory</button>
+                </header>
+                <div className="space-y-4">
+                  {students.slice(0, 6).map((student) => (
+                    <div key={student.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center space-x-4 hover:shadow-md transition-shadow">
+                      <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-lg">
+                        {student.displayName?.charAt(0) || 'S'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{student.displayName || student.email}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{student.batch || 'Unassigned'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-blue-500/30 transition-colors"></div>
+                <h3 className="text-xl font-bold text-white mb-4 italic font-serif">Quick Support</h3>
+                <p className="text-slate-400 text-sm font-medium mb-8">Direct student chat channel is active for immediate problem solving.</p>
+                <button 
+                  onClick={() => setActiveTab('chats')}
+                  className="w-full bg-white text-slate-900 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-blue-500 hover:text-white transition-all shadow-xl shadow-black/20"
+                >
+                  Enter Chatroom
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : (

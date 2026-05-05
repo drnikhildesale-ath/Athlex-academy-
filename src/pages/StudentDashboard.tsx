@@ -201,18 +201,12 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     return () => {
       unsubscribeCourses();
       unsubscribeQuizzes();
-      unsubscribeMaterials();
       unsubscribeLiveClasses();
-      unsubscribeRecordings();
-      unsubscribeFlashcards();
-      unsubscribeExercises();
-      unsubscribeKnowledge();
-      unsubscribeAnnouncements();
       unsubscribeChat();
       unsubscribeScores();
       unsubscribeProgress();
     };
-  }, [user.uid, activeCourseId]); // Removed scores.length to avoid possible loops
+  }, [user?.uid, activeCourseId]); // Removed scores.length to avoid possible loops
 
   const handleSendFeedback = async () => {
     if (!user?.uid || !activeCourseId) return;
