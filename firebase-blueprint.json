@@ -297,9 +297,23 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["adminId", "adminName", "action", "createdAt"]
+    },
+    "Batch": {
+      "title": "Batch",
+      "description": "A student batch group.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the batch (e.g., 'Morning 2024', 'Evening ACE')" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "createdAt"]
     }
   },
   "firestore": {
+    "/batches/{batchId}": {
+      "schema": "Batch",
+      "description": "Collection of defined student batches."
+    },
     "/activityLogs/{logId}": {
       "schema": "ActivityLog",
       "description": "Historical log of admin actions recorded for auditing."

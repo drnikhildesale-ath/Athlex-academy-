@@ -45,10 +45,14 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [notifications, setNotifications] = React.useState<any[]>([]);
   const [activityLogs, setActivityLogs] = React.useState<any[]>([]);
   const [allUsers, setAllUsers] = React.useState<any[]>([]);
+  const [batches, setBatches] = React.useState<any[]>([]);
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [courses, setCourses] = React.useState<any[]>([]);
   const [activeCourseId, setActiveCourseId] = React.useState<string>('');
   
+  const [newBatchName, setNewBatchName] = React.useState('');
+  const [isManagingBatches, setIsManagingBatches] = React.useState(false);
+
   const superAdminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
   const isSuperAdmin = superAdminEmails.includes(user?.email || '');
 
@@ -206,11 +210,21 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
 
+    const unsubscribeBatches = onSnapshot(query(collection(db, 'batches'), orderBy('name', 'asc')), (snapshot) => {
+      setBatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'batches'));
+
     const unsubscribeCourses = onSnapshot(query(collection(db, 'courses'), orderBy('createdAt', 'desc')), (snapshot) => {
       const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCourses(fetchedCourses);
-      if (fetchedCourses.length > 0 && !activeCourseId) {
-        setActiveCourseId(fetchedCourses[0].id);
+      if (fetchedCourses.length > 0) {
+        if (!activeCourseId) {
+          setActiveCourseId(fetchedCourses[0].id);
+        }
+        // Set default course for announcement form if not set
+        if (!announcementCourseId) {
+          setAnnouncementCourseId(activeCourseId || fetchedCourses[0].id);
+        }
       }
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'courses'));
 
@@ -230,6 +244,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       unsubscribeNotifications();
       unsubscribeLogs();
       unsubscribeAllUsers();
+      unsubscribeBatches();
       unsubscribeCourses();
     };
   }, [activeCourseId]);
@@ -653,7 +668,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         content: announcementContent,
         type: announcementType,
         courseId: announcementCourseId || null,
-        batch: announcementBatch || null,
+        batch: announcementBatch.trim() || null,
         createdAt: serverTimestamp(),
         createdBy: user.uid
       });
@@ -747,6 +762,35 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   };
 
+  const handleCreateBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBatchName.trim()) return;
+
+    try {
+      const docRef = await addDoc(collection(db, 'batches'), {
+        name: newBatchName.trim(),
+        createdAt: serverTimestamp()
+      });
+      await logAdminAction('Create Batch', 'Batch', docRef.id, `Created batch "${newBatchName.trim()}"`);
+      setNewBatchName('');
+      setStatus({ type: 'success', message: `Batch "${newBatchName}" created!` });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'batches');
+    }
+  };
+
+  const handleDeleteBatch = async (id: string, name: string) => {
+    if (!window.confirm(`Delete batch "${name}"? Status of students already in this batch won't change, but it will be removed from dropdowns.`)) return;
+
+    try {
+      await deleteDoc(doc(db, 'batches', id));
+      await logAdminAction('Delete Batch', 'Batch', id, `Deleted batch "${name}"`);
+      setStatus({ type: 'success', message: `Batch deleted.` });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `batches/${id}`);
+    }
+  };
+
   const handleDeleteExercise = async (id: string) => {
     if (window.confirm("Delete this exercise?")) {
       try {
@@ -790,7 +834,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const handleUpdateStudentBatch = async (studentId: string, batch: string) => {
     try {
       await updateDoc(doc(db, 'users', studentId), {
-        batch
+        batch: batch.trim()
       });
       setStatus({ type: 'success', message: "Student batch updated!" });
     } catch (err) {
@@ -1065,6 +1109,75 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           </div>
         </div>
       </header>
+
+      {/* Batch Management Modal */}
+      <AnimatePresence>
+        {isManagingBatches && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsManagingBatches(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-slate-900 tracking-tight">Batch Management</h3>
+                  <button onClick={() => setIsManagingBatches(false)} className="p-2 hover:bg-slate-100 rounded-xl">
+                    <X className="h-5 w-5 text-slate-400" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateBatch} className="flex space-x-2 mb-8">
+                  <input
+                    type="text"
+                    value={newBatchName}
+                    onChange={(e) => setNewBatchName(e.target.value)}
+                    placeholder="Enter new batch name..."
+                    className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-medium"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all"
+                  >
+                    Add
+                  </button>
+                </form>
+
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Batches</p>
+                  {batches.length === 0 ? (
+                    <p className="text-center py-8 text-slate-400 text-sm">No batches created yet.</p>
+                  ) : (
+                    batches.map((batch) => (
+                      <div key={batch.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl group transition-all hover:bg-slate-100">
+                        <span className="font-bold text-slate-700">{batch.name}</span>
+                        <button
+                          onClick={() => handleDeleteBatch(batch.id, batch.name)}
+                          className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="bg-slate-50 p-6 text-center">
+                <p className="text-[10px] text-slate-400 font-bold italic">Changing batch names here will not affect existing student records already assigned to them.</p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
         {showReview && draftQuiz ? (
         <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl mb-12 animate-in fade-in slide-in-from-bottom-4">
@@ -1834,14 +1947,26 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Target Batch (Optional)</label>
-                      <input
-                        type="text"
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center justify-between">
+                        Target Batch (Optional)
+                        <button 
+                          type="button" 
+                          onClick={() => setIsManagingBatches(true)}
+                          className="text-[8px] text-blue-600 hover:underline"
+                        >
+                          + Manage Batches
+                        </button>
+                      </label>
+                      <select
                         value={announcementBatch}
                         onChange={(e) => setAnnouncementBatch(e.target.value)}
-                        placeholder="e.g. Morning-Jan"
                         className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 text-sm font-medium"
-                      />
+                      >
+                        <option value="">All Batches</option>
+                        {batches.map(b => (
+                          <option key={b.id} value={b.name}>{b.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -2775,19 +2900,38 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     />
                   </div>
                   <div className="flex items-center space-x-2 overflow-x-auto pb-2">
-                    {Array.from(new Set(students.map(s => s.batch).filter(Boolean))).map(batch => (
-                      <button
-                        key={batch as string}
-                        onClick={() => setActiveBatchFilter(activeBatchFilter === batch ? '' : batch as string)}
-                        className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-                          activeBatchFilter === batch 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
-                            : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'
-                        }`}
-                      >
-                        {batch as string}
-                      </button>
-                    ))}
+                    <button
+                      onClick={() => setIsManagingBatches(true)}
+                      className="px-4 py-2 rounded-xl border border-blue-100 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap hover:bg-blue-100"
+                    >
+                      <Plus className="h-3 w-3 inline mr-1" /> Manage
+                    </button>
+                    <button
+                      onClick={() => setActiveBatchFilter(activeBatchFilter === 'unassigned' ? '' : 'unassigned')}
+                      className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                        activeBatchFilter === 'unassigned' 
+                          ? 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-500/20' 
+                          : 'bg-white border-slate-100 text-amber-500 hover:border-amber-200'
+                      }`}
+                    >
+                      Unassigned
+                    </button>
+                    {batches.map(batchDoc => {
+                      const batch = batchDoc.name;
+                      return (
+                        <button
+                          key={batchDoc.id}
+                          onClick={() => setActiveBatchFilter(activeBatchFilter === batch ? '' : batch as string)}
+                          className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                            activeBatchFilter === batch 
+                              ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                              : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'
+                          }`}
+                        >
+                          {batch}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -2796,7 +2940,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     .filter(s => 
                       (s.displayName?.toLowerCase().includes(studentSearch.toLowerCase()) || 
                        s.email?.toLowerCase().includes(studentSearch.toLowerCase())) &&
-                      (!activeBatchFilter || s.batch === activeBatchFilter)
+                      (!activeBatchFilter || (activeBatchFilter === 'unassigned' ? !s.batch : s.batch === activeBatchFilter))
                     )
                     .map((student) => (
                     <div key={student.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between gap-6">
@@ -2850,26 +2994,26 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         </div>
 
                         <div className="flex flex-col">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch Assignment</label>
-                          <div className="flex space-x-2">
-                            <input 
-                              type="text"
-                              id={`batch-input-${student.id}`}
-                              defaultValue={student.batch || ""}
-                              placeholder="e.g. Batch A"
-                              className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                            />
-                            <button
-                              onClick={() => {
-                                const val = (document.getElementById(`batch-input-${student.id}`) as HTMLInputElement).value;
-                                handleUpdateStudentBatch(student.id, val);
-                              }}
-                              className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-black"
-                              title="Save Batch"
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+                            Batch Assignment
+                            <button 
+                              onClick={() => setIsManagingBatches(true)}
+                              className="text-[8px] text-blue-600 hover:underline"
                             >
-                              <CheckCircle2 className="h-4 w-4" />
+                              + Edit
                             </button>
-                          </div>
+                          </label>
+                          <select
+                            id={`batch-input-${student.id}`}
+                            defaultValue={student.batch || ""}
+                            onChange={(e) => handleUpdateStudentBatch(student.id, e.target.value)}
+                            className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          >
+                            <option value="">No Batch</option>
+                            {batches.map(b => (
+                              <option key={b.id} value={b.name}>{b.name}</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     </div>

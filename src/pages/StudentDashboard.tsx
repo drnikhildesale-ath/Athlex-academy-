@@ -548,8 +548,8 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       {/* Announcements */}
       {announcements.filter(a => {
         const isSystemWide = !a.courseId && !a.batch;
-        const matchesCourse = !a.courseId || a.courseId === activeCourseId;
-        const matchesBatch = !a.batch || a.batch === user.batch;
+        const matchesCourse = !a.courseId || user.approvedCourseIds?.includes(a.courseId);
+        const matchesBatch = !a.batch || a.batch.toLowerCase().trim() === user.batch?.toLowerCase().trim();
         return isSystemWide || (matchesCourse && matchesBatch);
       }).length > 0 && (
         <div className="mb-12 space-y-4">
@@ -562,8 +562,8 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           <div className="grid grid-cols-1 gap-4">
             {announcements.filter(a => {
               const isSystemWide = !a.courseId && !a.batch;
-              const matchesCourse = !a.courseId || a.courseId === activeCourseId;
-              const matchesBatch = !a.batch || a.batch === user.batch;
+              const matchesCourse = !a.courseId || user.approvedCourseIds?.includes(a.courseId);
+              const matchesBatch = !a.batch || a.batch.toLowerCase().trim() === user.batch?.toLowerCase().trim();
               return isSystemWide || (matchesCourse && matchesBatch);
             }).map((ann) => (
               <motion.div
@@ -577,7 +577,14 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               >
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="font-bold text-slate-900">{ann.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-slate-900">{ann.title}</h3>
+                      {ann.courseId && (
+                        <span className="text-[8px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded font-black uppercase tracking-widest">
+                          {courses.find(c => c.id === ann.courseId)?.title || 'Course'}
+                        </span>
+                      )}
+                    </div>
                     <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
                       ann.type === 'urgent' ? 'bg-red-600 text-white animate-pulse' :
                       ann.type === 'task' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
