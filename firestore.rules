@@ -98,7 +98,7 @@ service cloud.firestore {
                data.googleFormUrl is string && isValidUrl(data.googleFormUrl)
              )) &&
              data.createdAt is timestamp &&
-             data.createdBy == request.auth.uid;
+             (resource == null ? data.createdBy == request.auth.uid : data.createdBy == resource.data.createdBy);
     }
 
     function isValidScore(data) {
@@ -118,7 +118,7 @@ service cloud.firestore {
              data.type in ['pdf', 'drive'] &&
              (data.type == 'pdf' ? (data.fileUrl is string && data.fileUrl.size() > 0) : (data.driveUrl is string && isValidUrl(data.driveUrl))) &&
              data.createdAt is timestamp &&
-             data.createdBy == request.auth.uid;
+             (resource == null ? data.createdBy == request.auth.uid : data.createdBy == resource.data.createdBy);
     }
 
     function isValidLiveClass(data) {
@@ -126,7 +126,7 @@ service cloud.firestore {
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
              data.link is string && data.link.size() > 0 &&
              data.createdAt is timestamp &&
-             data.createdBy == request.auth.uid;
+             (resource == null ? data.createdBy == request.auth.uid : data.createdBy == resource.data.createdBy);
     }
 
     function isValidInquiry(data) {
@@ -153,7 +153,7 @@ service cloud.firestore {
              data.courseId is string &&
              data.assignedTo is list &&
              data.createdAt is timestamp &&
-             data.createdBy == request.auth.uid;
+             (resource == null ? data.createdBy == request.auth.uid : data.createdBy == resource.data.createdBy);
     }
 
     function isValidCourse(data) {
@@ -182,10 +182,12 @@ service cloud.firestore {
     }
 
     function isValidExercise(data) {
-      return hasRequiredFields(['name', 'videoUrl', 'createdAt']) &&
+      return hasRequiredFields(['name', 'videoUrl', 'createdAt', 'createdBy', 'assignedTo']) &&
              data.name is string && data.name.size() > 0 &&
              isValidUrl(data.videoUrl) &&
-             data.createdAt is timestamp;
+             data.assignedTo is list &&
+             data.createdAt is timestamp &&
+             (resource == null ? data.createdBy == request.auth.uid : data.createdBy == resource.data.createdBy);
     }
 
     function isValidKnowledgeVideo(data) {
@@ -202,7 +204,7 @@ service cloud.firestore {
              data.content is string && data.content.size() > 0 &&
              data.type in ['info', 'task', 'urgent'] &&
              data.createdAt is timestamp &&
-             data.createdBy == request.auth.uid;
+             (resource == null ? data.createdBy == request.auth.uid : data.createdBy == resource.data.createdBy);
     }
 
     function isValidClassRecording(data) {
@@ -211,7 +213,7 @@ service cloud.firestore {
              isValidUrl(data.videoUrl) &&
              data.courseId is string &&
              data.createdAt is timestamp &&
-             data.createdBy == request.auth.uid;
+             (resource == null ? data.createdBy == request.auth.uid : data.createdBy == resource.data.createdBy);
     }
 
     function isValidChatMessage(data) {
@@ -386,9 +388,11 @@ service cloud.firestore {
     }
 
     match /exercises/{exerciseId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidExercise(request.resource.data);
-      allow update: if isAdmin() && isValidExercise(request.resource.data);
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        (resource.data.get('assignedTo', []) != null && request.auth.uid in resource.data.get('assignedTo', []))
+      );
+      allow create, update: if isAdmin() && isValidExercise(request.resource.data);
       allow delete: if isAdmin();
     }
 

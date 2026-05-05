@@ -911,11 +911,11 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 Exercise Library
               </h2>
               <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">
-                {exercises.length} Videos
+                {exercises.filter(ex => ex.assignedTo?.includes(user.uid)).length} Videos
               </span>
             </div>
             <div className="overflow-y-auto max-h-[600px] pr-2 space-y-6">
-              {exercises.map((ex) => (
+              {exercises.filter(ex => ex.assignedTo?.includes(user.uid)).map((ex) => (
                 <div key={ex.id} className="group cursor-pointer">
                   <div className="aspect-video relative rounded-2xl overflow-hidden mb-3">
                     <img 
@@ -936,12 +936,12 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Biomechanics Tutorial</p>
                 </div>
               ))}
-              {exercises.length > 3 && (
+              {exercises.filter(ex => ex.assignedTo?.includes(user.uid)).length > 3 && (
                  <button className="w-full py-4 rounded-2xl border-2 border-dashed border-slate-100 text-xs font-black text-slate-400 uppercase tracking-widest hover:border-blue-200 hover:text-blue-600 transition-all">
                    View Entire Library
                  </button>
               )}
-              {exercises.length === 0 && (
+              {exercises.filter(ex => ex.assignedTo?.includes(user.uid)).length === 0 && (
                 <p className="text-slate-400 text-sm italic text-center py-4">Tutorials coming soon.</p>
               )}
             </div>

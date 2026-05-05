@@ -621,19 +621,31 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (!exerciseName || !exerciseVideoUrl) return;
 
     try {
-      await addDoc(collection(db, 'exercises'), {
+      const docRef = await addDoc(collection(db, 'exercises'), {
         name: exerciseName,
         category: exerciseCategory,
         videoUrl: exerciseVideoUrl,
         description: exerciseDescription,
-        createdAt: serverTimestamp()
+        assignedTo: [],
+        createdAt: serverTimestamp(),
+        createdBy: user.uid
       });
+      await logAdminAction('Add Exercise', 'Exercise', docRef.id, `Added exercise "${exerciseName}"`);
       setExerciseName('');
       setExerciseVideoUrl('');
       setExerciseDescription('');
       setStatus({ type: 'success', message: "Exercise added to library!" });
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'exercises');
+    }
+  };
+
+  const handleAssignExercise = async (exerciseId: string, studentIds: string[]) => {
+    try {
+      await setDoc(doc(db, 'exercises', exerciseId), { assignedTo: studentIds }, { merge: true });
+      setStatus({ type: 'success', message: "Exercise access updated!" });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `exercises/${exerciseId}`);
     }
   };
 
@@ -2773,10 +2785,42 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           href={exercise.videoUrl} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-blue-600 text-[10px] font-black uppercase tracking-widest flex items-center hover:underline"
+                          className="text-blue-600 text-[10px] font-black uppercase tracking-widest flex items-center hover:underline mb-6"
                         >
                           <Globe className="h-3 w-3 mr-1" /> View on YouTube
                         </a>
+
+                        <div className="pt-6 border-t border-slate-50">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Assign Student Access</label>
+                          <div className="flex flex-wrap gap-2">
+                            {students.map((student) => {
+                              const isAssigned = exercise.assignedTo?.includes(student.id);
+                              return (
+                                <button
+                                  key={student.id}
+                                  onClick={() => {
+                                    const newAssigned = isAssigned
+                                      ? (exercise.assignedTo || []).filter((id: string) => id !== student.id)
+                                      : [...(exercise.assignedTo || []), student.id];
+                                    handleAssignExercise(exercise.id, newAssigned);
+                                  }}
+                                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${
+                                    isAssigned 
+                                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                                      : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-blue-200'
+                                  }`}
+                                >
+                                  {student.photoURL ? (
+                                    <img src={student.photoURL} className="w-4 h-4 rounded-full" alt="" referrerPolicy="no-referrer" />
+                                  ) : (
+                                    <Users className="w-3 h-3" />
+                                  )}
+                                  <span className="max-w-[80px] truncate">{student.displayName || student.email.split('@')[0]}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}

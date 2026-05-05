@@ -164,9 +164,11 @@
         "category": { "type": "string", "description": "e.g., 'Lower Body', 'Core'" },
         "videoUrl": { "type": "string", "format": "uri" },
         "description": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "assignedTo": { "type": "array", "items": { "type": "string" }, "description": "List of student UIDs assigned to this exercise." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
       },
-      "required": ["name", "videoUrl", "createdAt"]
+      "required": ["name", "videoUrl", "createdAt", "createdBy"]
     },
     "KnowledgeVideo": {
       "title": "Knowledge Sharing Video",
