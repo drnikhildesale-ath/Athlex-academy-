@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { collection, query, orderBy, onSnapshot, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, getDocs, where, limit, limitToLast } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X, Megaphone, CheckCircle2, Activity, Lightbulb, MessageSquare, BookCheck, Sparkles, LogOut, ArrowRight, User, Lock } from 'lucide-react';
 
@@ -135,29 +135,37 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       setFlashcardSets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'flashcards'));
 
-    // Fetch Exercises
-    const exercisesQuery = query(collection(db, 'exercises'), orderBy('createdAt', 'desc'));
+    // Fetch Exercises - filter by assignedTo to respect security rules
+    const exercisesQuery = query(
+      collection(db, 'exercises'), 
+      where('assignedTo', 'array-contains', user.uid),
+      orderBy('createdAt', 'desc')
+    );
     const unsubscribeExercises = onSnapshot(exercisesQuery, (snapshot) => {
       setExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'exercises'));
+    }, (error) => {
+      console.error("Exercises listener error:", error);
+      handleFirestoreError(error, OperationType.LIST, 'exercises');
+    });
 
-    // Fetch Knowledge Videos
-    const knowledgeQuery = query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc'));
+    // Fetch Knowledge Videos (limited to 50 for performance)
+    const knowledgeQuery = query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc'), limit(50));
     const unsubscribeKnowledge = onSnapshot(knowledgeQuery, (snapshot) => {
       setKnowledgeVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'knowledgeVideos'));
 
-    // Fetch Announcements
-    const announcementsQuery = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
+    // Fetch Announcements (limited to 20 for performance)
+    const announcementsQuery = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(20));
     const unsubscribeAnnouncements = onSnapshot(announcementsQuery, (snapshot) => {
       setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
 
-    // Fetch Chat Messages
+    // Fetch Chat Messages (limited to last 100 for quota)
     const chatQuery = query(
       collection(db, 'chatMessages'),
       where('studentId', '==', user.uid),
-      orderBy('createdAt', 'asc')
+      orderBy('createdAt', 'asc'),
+      limitToLast(100)
     );
     const unsubscribeChat = onSnapshot(chatQuery, (snapshot) => {
       setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -204,7 +212,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       unsubscribeScores();
       unsubscribeProgress();
     };
-  }, [user.uid, activeCourseId, scores.length]);
+  }, [user.uid, activeCourseId]); // Removed scores.length to avoid possible loops
 
   const handleSendFeedback = async () => {
     if (!user?.uid || !activeCourseId) return;

@@ -41,6 +41,16 @@ export default function App() {
             // Listen for user profile changes
             const userRef = doc(db, 'users', firebaseUser.uid);
             
+            // Throttle last login updates to once per hour per device
+            const lastUpdateKey = `last_login_${firebaseUser.uid}`;
+            const lastUpdate = localStorage.getItem(lastUpdateKey);
+            const now = Date.now();
+            
+            if (!lastUpdate || now - parseInt(lastUpdate) > 3600000) {
+              updateDoc(userRef, { lastLogin: serverTimestamp() }).catch(() => {});
+              localStorage.setItem(lastUpdateKey, now.toString());
+            }
+
             unsubscribeUser = onSnapshot(userRef, async (userSnap) => {
               try {
                 if (!userSnap.exists()) {
@@ -74,10 +84,7 @@ export default function App() {
                   const adminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
                   const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
                   
-                  // Update last login (fire and forget)
-                  updateDoc(userRef, { lastLogin: serverTimestamp() }).catch(() => {});
-                  
-                  // Auto-fix admin roles
+                  // Auto-fix admin roles - only update if necessary to avoid loops
                   if (isAdminEmail && (userData as any).role !== 'admin') {
                     setDoc(userRef, { role: 'admin' }, { merge: true }).catch(() => {});
                   }

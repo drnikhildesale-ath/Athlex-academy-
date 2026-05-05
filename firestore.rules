@@ -42,8 +42,16 @@ service cloud.firestore {
     // Helper Functions
     // ===============================================================
 
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isAuthenticated() {
+      return isSignedIn();
     }
 
     function isOwner(userId) {

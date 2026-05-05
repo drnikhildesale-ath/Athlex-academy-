@@ -122,12 +122,19 @@ export default function LandingPage() {
   const [stories, setStories] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    const q = query(collection(db, 'successStories'), orderBy('order', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedStories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStories(fetchedStories.length > 0 ? fetchedStories : SUCCESS_STORIES);
-    });
-    return () => unsubscribe();
+    const fetchStories = async () => {
+      try {
+        const { getDocs } = await import('firebase/firestore');
+        const q = query(collection(db, 'successStories'), orderBy('order', 'asc'));
+        const snapshot = await getDocs(q);
+        const fetchedStories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setStories(fetchedStories.length > 0 ? fetchedStories : SUCCESS_STORIES);
+      } catch (err) {
+        console.error("Error fetching stories:", err);
+        setStories(SUCCESS_STORIES);
+      }
+    };
+    fetchStories();
   }, []);
 
   const handleInquiry = async (e: React.FormEvent) => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc, updateDoc, limit, limitToLast } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
@@ -146,13 +146,14 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   React.useEffect(() => {
     if (!user) return;
 
-    // Fetch all quizzes for admin to manage
-    const quizzesQuery = query(collection(db, 'quizzes'), orderBy('createdAt', 'desc'));
+    // Fetch all quizzes (limited to 100)
+    const quizzesQuery = query(collection(db, 'quizzes'), orderBy('createdAt', 'desc'), limit(100));
     const unsubscribeQuizzes = onSnapshot(quizzesQuery, (snapshot) => {
       setQuizzes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'quizzes'));
 
-    const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'));
+    // Fetch students (limited to 200)
+    const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'), limit(200));
     const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
       setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
@@ -173,19 +174,19 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setSuccessStories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'successStories'));
 
-    const unsubscribeFlashcards = onSnapshot(query(collection(db, 'flashcards'), orderBy('createdAt', 'desc')), (snapshot) => {
+    const unsubscribeFlashcards = onSnapshot(query(collection(db, 'flashcards'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
       setFlashcardSets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'flashcards'));
 
-    const unsubscribeExercises = onSnapshot(query(collection(db, 'exercises'), orderBy('createdAt', 'desc')), (snapshot) => {
+    const unsubscribeExercises = onSnapshot(query(collection(db, 'exercises'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
       setExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'exercises'));
 
-    const unsubscribeKnowledge = onSnapshot(query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc')), (snapshot) => {
+    const unsubscribeKnowledge = onSnapshot(query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
       setKnowledgeVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'knowledgeVideos'));
 
-    const unsubscribeRecordings = onSnapshot(query(collection(db, 'classRecordings'), orderBy('createdAt', 'desc')), (snapshot) => {
+    const unsubscribeRecordings = onSnapshot(query(collection(db, 'classRecordings'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
       setRecordings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'classRecordings'));
 
@@ -193,15 +194,18 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
 
-    const unsubscribeChats = onSnapshot(query(collection(db, 'chatMessages'), orderBy('createdAt', 'asc')), (snapshot) => {
+    // Fetch Chat Messages (limited for quota)
+    const unsubscribeChats = onSnapshot(query(collection(db, 'chatMessages'), orderBy('createdAt', 'asc'), limitToLast(100)), (snapshot) => {
       setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'chatMessages'));
 
-    const unsubscribeNotifications = onSnapshot(query(collection(db, 'notifications'), where('read', '==', false), orderBy('createdAt', 'desc')), (snapshot) => {
+    // Fetch notifications (unread only)
+    const unsubscribeNotifications = onSnapshot(query(collection(db, 'notifications'), where('read', '==', false), orderBy('createdAt', 'desc'), limit(50)), (snapshot) => {
       setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'notifications'));
 
-    const unsubscribeLogs = isSuperAdmin ? onSnapshot(query(collection(db, 'activityLogs'), orderBy('createdAt', 'desc')), (snapshot) => {
+    // Fetch activity logs (limited to 100 for performance/quota)
+    const unsubscribeLogs = isSuperAdmin ? onSnapshot(query(collection(db, 'activityLogs'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
       setActivityLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'activityLogs')) : () => {};
 
@@ -697,7 +701,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   React.useEffect(() => {
     if (!user) return;
-    const scoresQuery = query(collection(db, 'scores'), orderBy('completedAt', 'desc'));
+    // Fetch all scores (limited to 200 for performance/quota)
+    const scoresQuery = query(collection(db, 'scores'), orderBy('completedAt', 'desc'), limit(200));
     const unsubscribeScores = onSnapshot(scoresQuery, (snapshot) => {
       setAllScores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'scores'));
