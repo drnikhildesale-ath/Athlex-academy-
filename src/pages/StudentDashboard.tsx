@@ -23,7 +23,37 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
   const [progress, setProgress] = React.useState<any | null>(null);
   const [chatMessages, setChatMessages] = React.useState<any[]>([]);
   const [activeVideo, setActiveVideo] = React.useState<any | null>(null);
-  const [isPipMinimized, setIsPipMinimized] = React.useState(false);
+
+  // Helper to get embeddable URL for various video sources
+  const getEmbedUrl = (url: string) => {
+    if (!url) return '';
+    
+    // YouTube
+    if (url.includes('youtube.com/watch?v=')) {
+      const id = url.split('v=')[1]?.split('&')[0];
+      return `https://www.youtube.com/embed/${id}?autoplay=1`;
+    }
+    if (url.includes('youtu.be/')) {
+      const id = url.split('youtu.be/')[1]?.split('?')[0];
+      return `https://www.youtube.com/embed/${id}?autoplay=1`;
+    }
+    if (url.includes('youtube.com/embed/')) {
+      return url.includes('?') ? `${url}&autoplay=1` : `${url}?autoplay=1`;
+    }
+
+    // Google Drive
+    if (url.includes('drive.google.com')) {
+      return url.replace('/view', '/preview').replace('/edit', '/preview');
+    }
+
+    // Vimeo
+    if (url.includes('vimeo.com/')) {
+      const id = url.split('vimeo.com/')[1]?.split('?')[0];
+      return `https://player.vimeo.com/video/${id}?autoplay=1`;
+    }
+
+    return url;
+  };
   const [newMessage, setNewMessage] = React.useState('');
   const [scores, setScores] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -722,7 +752,6 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                     <div 
                       onClick={() => {
                         setActiveVideo(rec);
-                        setIsPipMinimized(false);
                       }}
                       className="aspect-video bg-slate-900 rounded-[1.5rem] mb-6 relative overflow-hidden shadow-lg group-hover:shadow-indigo-500/20 transition-all"
                     >
@@ -837,7 +866,11 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             </div>
             <div className="overflow-y-auto max-h-[600px] pr-2 space-y-6">
               {exercises.filter(ex => ex.assignedTo?.includes(user.uid)).map((ex) => (
-                <div key={ex.id} className="group cursor-pointer">
+                <div 
+                  key={ex.id} 
+                  className="group cursor-pointer"
+                  onClick={() => setActiveVideo({...ex, title: ex.name, chapter: 'Tutorial'})}
+                >
                   <div className="aspect-video relative rounded-2xl overflow-hidden mb-3">
                     <img 
                       src={`https://img.youtube.com/vi/${ex.videoUrl.split('v=')[1]?.split('&')[0] || ex.videoUrl.split('/').pop()}/mqdefault.jpg`} 
@@ -876,12 +909,10 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             </h2>
             <div className="space-y-4">
               {knowledgeVideos.map((video) => (
-                <a 
+                <div 
                   key={video.id}
-                  href={video.videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center space-x-4 p-4 rounded-2xl bg-white border border-slate-100 hover:border-amber-200 transition-all group"
+                  onClick={() => setActiveVideo({...video, chapter: 'Hub'})}
+                  className="flex items-center space-x-4 p-4 rounded-2xl bg-white border border-slate-100 hover:border-amber-200 transition-all group cursor-pointer"
                 >
                   <div className="bg-amber-50 p-2.5 rounded-xl text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-all overflow-hidden relative">
                     <PlayCircle className="h-5 w-5 relative z-10" />
@@ -892,7 +923,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                       {video.category} • {formatFirebaseDate(video.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                </a>
+                </div>
               ))}
               {knowledgeVideos.length === 0 && (
                 <p className="text-slate-400 text-sm italic text-center py-4">No videos shared yet.</p>
@@ -934,10 +965,8 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                       </div>
                     </a>
                     {item.recordingLink && (
-                      <a 
-                        href={item.recordingLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
+                      <div 
+                        onClick={() => setActiveVideo({title: `${item.title} (Recording)`, videoUrl: item.recordingLink, chapter: 'Live'})}
                         className="flex items-center justify-between p-3 bg-red-500/20 rounded-2xl border border-white/5 hover:bg-red-500/30 transition-all cursor-pointer group ml-4"
                       >
                         <div className="flex items-center space-x-3">
@@ -945,11 +974,11 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                             <Video className="h-4 w-4" />
                           </div>
                           <div>
-                            <div className="text-xs font-bold">Watch Recording</div>
+                            <div className="text-xs font-bold font-serif italic">Watch Recording</div>
                           </div>
                         </div>
-                        <ExternalLink className="h-3 w-3 text-white/60 group-hover:text-white transition-all" />
-                      </a>
+                        <PlayCircle className="h-4 w-4 text-white/60 group-hover:text-white transition-all scale-75" />
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1309,65 +1338,85 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           )}
         </AnimatePresence>
 
-        {/* In-App Picture-in-Picture Video Player */}
+        {/* Enhanced Video Player Modal */}
         <AnimatePresence>
           {activeVideo && (
             <motion.div
-              layout
-              initial={{ opacity: 0, scale: 0.8, y: 100 }}
-              animate={{ 
-                opacity: 1, 
-                scale: 1, 
-                y: 0,
-                width: isPipMinimized ? 300 : '100%',
-                maxWidth: isPipMinimized ? 300 : 800,
-                height: isPipMinimized ? 180 : 'auto',
-                bottom: 24,
-                right: 24,
-                left: isPipMinimized ? 'auto' : '50%',
-                x: isPipMinimized ? 0 : '-50%',
-                position: 'fixed'
-              }}
-              exit={{ opacity: 0, scale: 0.8, y: 100 }}
-              className={`z-[100] bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden border border-slate-700/50 flex flex-col`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8"
             >
-              <div className="flex items-center justify-between p-4 bg-slate-800/80 backdrop-blur-md border-b border-slate-700/50">
-                <div className="flex items-center space-x-3 overflow-hidden">
-                  <PlayCircle className="h-5 w-5 text-blue-400 shrink-0" />
-                  <span className="text-white text-xs font-bold truncate tracking-tight">{activeVideo.title}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button 
-                    onClick={() => setIsPipMinimized(!isPipMinimized)}
-                    className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
-                  >
-                    {isPipMinimized ? <ArrowRight className="h-4 w-4" /> : <X className="h-4 w-4 rotate-45" />}
-                  </button>
+              <div 
+                className="absolute inset-0 bg-slate-900/95 backdrop-blur-xl" 
+                onClick={() => setActiveVideo(null)}
+              />
+              
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="relative w-full max-w-5xl bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 flex flex-col aspect-video md:aspect-auto md:h-auto"
+              >
+                <div className="flex items-center justify-between p-6 border-b border-white/5">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+                      <PlayCircle className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold leading-tight">{activeVideo.title}</h3>
+                      <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest mt-0.5">Chapter {activeVideo.chapter} • Performance Record</p>
+                    </div>
+                  </div>
                   <button 
                     onClick={() => setActiveVideo(null)}
-                    className="p-1.5 hover:bg-red-600 rounded-lg text-slate-400 hover:text-white transition-colors"
+                    className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-white transition-all hover:rotate-90"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-6 w-6" />
                   </button>
                 </div>
-              </div>
-              
-              <div className={`aspect-video w-full relative group ${isPipMinimized ? 'h-full' : ''}`}>
-                <iframe
-                  src={activeVideo.videoUrl.includes('youtube.com/watch?v=') 
-                    ? `https://www.youtube.com/embed/${activeVideo.videoUrl.split('v=')[1]?.split('&')[0]}?autoplay=1` 
-                    : activeVideo.videoUrl}
-                  className="w-full h-full border-0 absolute inset-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
-                {isPipMinimized && (
-                  <div 
-                    onClick={() => setIsPipMinimized(false)}
-                    className="absolute inset-0 bg-transparent cursor-pointer z-10" 
-                  />
-                )}
-              </div>
+                
+                <div className="flex-1 bg-black relative aspect-video">
+                  <iframe
+                    src={getEmbedUrl(activeVideo.videoUrl)}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  ></iframe>
+                </div>
+                
+                <div className="p-6 bg-slate-800/50 backdrop-blur-md hidden md:block">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-6">
+                      <div className="text-center">
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Duration</div>
+                        <div className="text-sm font-bold text-white">Full Session</div>
+                      </div>
+                      <div className="w-px h-8 bg-white/10"></div>
+                      <div className="text-center">
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Quality</div>
+                        <div className="text-sm font-bold text-white">HD 1080p</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button 
+                         onClick={() => {
+                           toggleItemCompletion(activeVideo.id);
+                           setActiveVideo(null);
+                         }}
+                         className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center space-x-2 ${
+                           completedItems.includes(activeVideo.id) 
+                           ? 'bg-green-600 text-white' 
+                           : 'bg-white text-slate-900 hover:bg-slate-100'
+                         }`}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>{completedItems.includes(activeVideo.id) ? 'Completed' : 'Mark as Viewed'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
