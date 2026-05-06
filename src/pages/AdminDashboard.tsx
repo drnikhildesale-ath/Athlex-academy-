@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc, updateDoc, limit, limitToLast, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, getDocsCached } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
-import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X, Award, Search, LayoutDashboard, Layout } from 'lucide-react';
+import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X, Award, Search, LayoutDashboard, Layout, RefreshCw } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -143,124 +143,84 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const fetchStaticData = React.useCallback(async (force = false) => {
+    setStatus({ type: 'success', message: 'Refreshing data...' });
+    try {
+      console.log("AdminDashboard: Fetching static data (cached)...");
+      
+      const [
+        quizzesData,
+        materialsData,
+        storiesData,
+        studentsData,
+        batchesData,
+        coursesData,
+        liveData,
+        inquiriesData,
+        flashcardsData,
+        exercisesData,
+        knowledgeData,
+        recordingsData,
+        announcementsData,
+        chatData,
+        notificationsData,
+        logsData
+      ] = await Promise.all([
+        getDocsCached(query(collection(db, 'quizzes'), orderBy('createdAt', 'desc'), limit(100)), 'admin_quizzes', force),
+        getDocsCached(query(collection(db, 'materials'), orderBy('createdAt', 'desc'), limit(100)), 'admin_materials', force),
+        getDocsCached(query(collection(db, 'successStories'), orderBy('order', 'asc')), 'admin_stories', force),
+        getDocsCached(query(collection(db, 'users'), where('role', '==', 'student'), limit(200)), 'admin_students', force),
+        getDocsCached(query(collection(db, 'batches'), orderBy('name', 'asc')), 'admin_batches', force),
+        getDocsCached(query(collection(db, 'courses'), orderBy('createdAt', 'desc')), 'admin_courses', force),
+        getDocsCached(query(collection(db, 'liveClasses'), orderBy('createdAt', 'desc'), limit(50)), 'admin_live', force),
+        getDocsCached(query(collection(db, 'inquiries'), orderBy('createdAt', 'desc'), limit(100)), 'admin_inquiries', force),
+        getDocsCached(query(collection(db, 'flashcards'), orderBy('createdAt', 'desc'), limit(100)), 'admin_flashcards', force),
+        getDocsCached(query(collection(db, 'exercises'), orderBy('createdAt', 'desc'), limit(100)), 'admin_exercises', force),
+        getDocsCached(query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc'), limit(100)), 'admin_knowledge', force),
+        getDocsCached(query(collection(db, 'classRecordings'), orderBy('createdAt', 'desc'), limit(100)), 'admin_recordings', force),
+        getDocsCached(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(50)), 'admin_announcements', force),
+        getDocsCached(query(collection(db, 'chatMessages'), orderBy('createdAt', 'asc'), limitToLast(100)), 'admin_chats', force),
+        getDocsCached(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50)), 'admin_notifications', force),
+        isSuperAdmin ? getDocsCached(query(collection(db, 'activityLogs'), orderBy('createdAt', 'desc'), limit(100)), 'admin_logs', force) : Promise.resolve([])
+      ]);
+
+      setQuizzes(quizzesData);
+      setMaterials(materialsData);
+      setSuccessStories(storiesData);
+      setStudents(studentsData);
+      setBatches(batchesData);
+      setCourses(coursesData);
+      
+      if (coursesData.length > 0) {
+        if (!activeCourseId) setActiveCourseId(coursesData[0].id);
+        if (!announcementCourseId) setAnnouncementCourseId(activeCourseId || coursesData[0].id);
+      }
+
+      setLiveClasses(liveData);
+      setInquiries(inquiriesData);
+      setFlashcardSets(flashcardsData);
+      setExercises(exercisesData);
+      setKnowledgeVideos(knowledgeData);
+      setRecordings(recordingsData);
+      setAnnouncements(announcementsData);
+      setChatMessages(chatData);
+      setNotifications(notificationsData);
+      setActivityLogs(logsData);
+      setAllUsers(studentsData); 
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('Quota exceeded')) {
+        console.warn("Firestore Quota Exceeded in AdminDashboard static fetch.");
+      } else {
+        handleFirestoreError(err, OperationType.LIST, 'admin_static_data');
+      }
+    }
+  }, [user?.uid, isSuperAdmin, activeCourseId, announcementCourseId]);
+
   React.useEffect(() => {
     if (!user) return;
-
-    // Fetch all quizzes (limited to 100)
-    const quizzesQuery = query(collection(db, 'quizzes'), orderBy('createdAt', 'desc'), limit(100));
-    const unsubscribeQuizzes = onSnapshot(quizzesQuery, (snapshot) => {
-      setQuizzes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'quizzes'));
-
-    // Static/Low-frequency Data: Fetch once to save quota
-    const fetchStaticData = async () => {
-      try {
-        const [materialsSnap, storiesSnap, usersSnap, batchesSnap, allUsersSnap] = await Promise.all([
-          getDocs(query(collection(db, 'materials'), orderBy('createdAt', 'desc'), limit(100))),
-          getDocs(query(collection(db, 'successStories'), orderBy('order', 'asc'))),
-          getDocs(query(collection(db, 'users'), where('role', '==', 'student'), limit(200))),
-          getDocs(query(collection(db, 'batches'), orderBy('name', 'asc'))),
-          getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)))
-        ]);
-
-        setMaterials(materialsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setSuccessStories(storiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setStudents(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setBatches(batchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setAllUsers(allUsersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (err) {
-        if (err instanceof Error && !err.message.includes('Quota exceeded')) {
-          console.error("Error fetching static admin data:", err);
-        }
-      }
-    };
-
     fetchStaticData();
-
-    const unsubscribeLiveClasses = onSnapshot(query(collection(db, 'liveClasses'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setLiveClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'liveClasses'));
-
-    const unsubscribeInquiries = onSnapshot(query(collection(db, 'inquiries'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'inquiries'));
-
-    const unsubscribeStories = onSnapshot(query(collection(db, 'successStories'), orderBy('order', 'asc')), (snapshot) => {
-      setSuccessStories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'successStories'));
-
-    const unsubscribeFlashcards = onSnapshot(query(collection(db, 'flashcards'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setFlashcardSets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'flashcards'));
-
-    const unsubscribeExercises = onSnapshot(query(collection(db, 'exercises'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'exercises'));
-
-    const unsubscribeKnowledge = onSnapshot(query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setKnowledgeVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'knowledgeVideos'));
-
-    const unsubscribeRecordings = onSnapshot(query(collection(db, 'classRecordings'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setRecordings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'classRecordings'));
-
-    const unsubscribeAnnouncements = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
-
-    // Fetch Chat Messages (limited for quota)
-    const unsubscribeChats = onSnapshot(query(collection(db, 'chatMessages'), orderBy('createdAt', 'asc'), limitToLast(100)), (snapshot) => {
-      setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'chatMessages'));
-
-    // Fetch notifications (unread only)
-    const unsubscribeNotifications = onSnapshot(query(collection(db, 'notifications'), where('read', '==', false), orderBy('createdAt', 'desc'), limit(50)), (snapshot) => {
-      setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'notifications'));
-
-    // Fetch activity logs (limited to 100 for performance/quota)
-    const unsubscribeLogs = isSuperAdmin ? onSnapshot(query(collection(db, 'activityLogs'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setActivityLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'activityLogs')) : () => {};
-
-    const unsubscribeAllUsers = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
-
-    const unsubscribeBatches = onSnapshot(query(collection(db, 'batches'), orderBy('name', 'asc')), (snapshot) => {
-      setBatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'batches'));
-
-    // Courses fetch
-    const unsubscribeCourses = onSnapshot(query(collection(db, 'courses'), orderBy('createdAt', 'desc')), (snapshot) => {
-      const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCourses(fetchedCourses);
-      if (fetchedCourses.length > 0) {
-        if (!activeCourseId) {
-          setActiveCourseId(fetchedCourses[0].id);
-        }
-        if (!announcementCourseId) {
-          setAnnouncementCourseId(activeCourseId || fetchedCourses[0].id);
-        }
-      }
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'courses'));
-
-    return () => {
-      unsubscribeQuizzes();
-      unsubscribeLiveClasses();
-      unsubscribeRecordings();
-      unsubscribeInquiries();
-      unsubscribeFlashcards();
-      unsubscribeExercises();
-      unsubscribeKnowledge();
-      unsubscribeAnnouncements();
-      unsubscribeChats();
-      unsubscribeNotifications();
-      unsubscribeLogs();
-      unsubscribeCourses();
-    };
-  }, [user?.uid, isSuperAdmin]); // Removed activeCourseId to prevent loops
+    return () => {};
+  }, [user?.uid, isSuperAdmin]); // Removed fetchStaticData from deps to avoid triggering loop if it updates state
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1086,9 +1046,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1 opacity-60">Manage your academy curriculum and student growth</p>
             </div>
             
-            <div className="flex items-center space-x-4">
-              {/* User Identity */}
-              <div className="hidden lg:flex flex-col items-end mr-4">
+              <div className="flex items-center space-x-4">
+                <button 
+                  onClick={() => fetchStaticData(true)}
+                  className="p-2 text-slate-400 hover:text-blue-600 transition-colors group relative"
+                  title="Refresh Data"
+                >
+                  <RefreshCw className="h-5 w-5 group-active:rotate-180 transition-transform duration-500" />
+                </button>
+
+                {/* User Identity */}
+                <div className="hidden lg:flex flex-col items-end mr-4">
                 <span className="text-sm font-black text-slate-900 leading-none mb-1">{user?.displayName || 'Administrator'}</span>
                 <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{isSuperAdmin ? 'Super Admin' : 'Admin'}</span>
               </div>

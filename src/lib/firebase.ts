@@ -54,6 +54,39 @@ export interface FirestoreErrorInfo {
   }
 }
 
+import { getDocs, Query, QuerySnapshot, DocumentData } from 'firebase/firestore';
+
+// Cache expiration: 5 minutes for most data
+const DEFAULT_CACHE_TIME = 5 * 60 * 1000;
+
+export async function getDocsCached(query: Query<DocumentData>, cacheKey: string, forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+  const cached = localStorage.getItem(`cache_${cacheKey}`);
+  
+  if (cached && !forceRefresh) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (now - timestamp < DEFAULT_CACHE_TIME) {
+      console.log(`Using cached data for ${cacheKey}`);
+      return data;
+    }
+  }
+
+  try {
+    const snapshot = await getDocs(query);
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    localStorage.setItem(`cache_${cacheKey}`, JSON.stringify({ data, timestamp: now }));
+    return data;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('Quota exceeded')) {
+      console.warn(`Quota exceeded for ${cacheKey}, using stale cache if available`);
+      if (cached) {
+        return JSON.parse(cached).data;
+      }
+    }
+    throw err;
+  }
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errorMessage = error instanceof Error ? error.message : String(error);
   const isQuotaError = errorMessage.includes('Quota exceeded') || errorMessage.includes('resource-exhausted');

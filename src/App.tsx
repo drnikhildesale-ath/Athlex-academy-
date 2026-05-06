@@ -51,8 +51,10 @@ export default function App() {
               localStorage.setItem(lastUpdateKey, now.toString());
             }
 
-            unsubscribeUser = onSnapshot(userRef, async (userSnap) => {
+            // Fetch user profile once instead of onSnapshot
+            const fetchUserProfile = async () => {
               try {
+                const userSnap = await getDoc(userRef);
                 if (!userSnap.exists()) {
                   console.log("User doc doesn't exist, creating...");
                   const newUser = {
@@ -77,35 +79,40 @@ export default function App() {
                       read: false
                     });
                   }
-                  // loading will be set to false by the next snapshot trigger
+                  setUser(newUser);
+                  setIsAdmin(newUser.role === 'admin');
                 } else {
                   const userData = userSnap.data();
                   console.log("User data loaded:", userData.role);
                   const adminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
                   const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
                   
-                  // Auto-fix admin roles - only update if necessary to avoid loops
-                  if (isAdminEmail && (userData as any).role !== 'admin') {
-                    setDoc(userRef, { role: 'admin' }, { merge: true }).catch(() => {});
+                  if (isAdminEmail && userData.role !== 'admin') {
+                    await updateDoc(userRef, { role: 'admin' });
+                    userData.role = 'admin';
                   }
                   
-                  setUser(userData);
-                  setIsAdmin((userData as any).role === 'admin' || isAdminEmail);
-                  setLoading(false);
+                  setUser({ ...userData, uid: firebaseUser.uid });
+                  setIsAdmin(userData.role === 'admin' || isAdminEmail);
                 }
-              } catch (snapErr) {
-                console.error("Snapshot callback error:", snapErr);
+              } catch (err) {
+                console.error("Error fetching user profile:", err);
+                const adminEmails = ['drnikhildesale@gmail.com', 'athlexacademy@gmail.com'];
+                const isAdminEmail = adminEmails.includes(firebaseUser.email || '');
+                setUser({
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+                  role: isAdminEmail ? 'admin' : 'student',
+                  isFallback: true
+                });
+                setIsAdmin(isAdminEmail);
+              } finally {
                 setLoading(false);
               }
-            }, (err) => {
-              console.error("Snapshot error listener caught:", err);
-              try {
-                handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
-              } catch (e) {
-                // Ignore throw to allow app to finish loading
-              }
-              setLoading(false);
-            });
+            };
+
+            fetchUserProfile();
           } else {
             console.log("No firebase user.");
             setUser(null);
@@ -118,10 +125,7 @@ export default function App() {
         }
       });
 
-      return () => {
-        unsubscribeAuth();
-        if (unsubscribeUser) unsubscribeUser();
-      };
+      return () => unsubscribeAuth();
     } catch (e) {
       console.error("App useEffect setup crashed:", e);
       setLoading(false);

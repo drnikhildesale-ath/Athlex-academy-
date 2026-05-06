@@ -2,8 +2,8 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, getDocs, where, limit, limitToLast } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X, Megaphone, CheckCircle2, Activity, Lightbulb, MessageSquare, BookCheck, Sparkles, LogOut, ArrowRight, User, Lock } from 'lucide-react';
+import { db, handleFirestoreError, OperationType, getDocsCached } from '../lib/firebase';
+import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X, Megaphone, CheckCircle2, Activity, Lightbulb, MessageSquare, BookCheck, Sparkles, LogOut, ArrowRight, User, Lock, RefreshCw } from 'lucide-react';
 
 interface StudentDashboardProps {
   user: any;
@@ -43,17 +43,39 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     setShowGuide(false);
   };
 
-  React.useEffect(() => {
-    if (!user?.uid) return;
+  const fetchStudentData = React.useCallback(async (force = false) => {
+    try {
+      console.log("StudentDashboard: Fetching static data (cached)...");
+      const [
+        coursesData,
+        quizzesData,
+        materialsData,
+        liveData,
+        recordingsData,
+        flashcardsData,
+        exercisesData,
+        knowledgeData,
+        announcementsData,
+        scoresData,
+        chatData,
+        progressData
+      ] = await Promise.all([
+        getDocsCached(collection(db, 'courses'), 'student_courses', force),
+        getDocsCached(query(collection(db, 'quizzes'), where('status', '==', 'published'), where('assignedTo', 'array-contains', user.uid)), 'student_quizzes', force),
+        getDocsCached(query(collection(db, 'materials'), where('assignedTo', 'array-contains', user.uid)), 'student_materials', force),
+        getDocsCached(query(collection(db, 'liveClasses'), where('assignedTo', 'array-contains', user.uid)), 'student_live', force),
+        getDocsCached(query(collection(db, 'classRecordings'), where('assignedTo', 'array-contains', user.uid)), 'student_recordings', force),
+        getDocsCached(query(collection(db, 'flashcards'), where('assignedTo', 'array-contains', user.uid)), 'student_flashcards', force),
+        getDocsCached(query(collection(db, 'exercises'), where('assignedTo', 'array-contains', user.uid), orderBy('createdAt', 'desc')), 'student_exercises', force),
+        getDocsCached(query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc'), limit(50)), 'student_knowledge', force),
+        getDocsCached(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(20)), 'student_announcements', force),
+        getDocsCached(query(collection(db, 'scores'), where('studentId', '==', user.uid), orderBy('completedAt', 'desc')), 'student_scores', force),
+        getDocsCached(query(collection(db, 'chatMessages'), where('studentId', '==', user.uid), orderBy('createdAt', 'asc'), limitToLast(100)), 'student_chats', force),
+        activeCourseId ? getDocsCached(query(collection(db, 'userProgress'), where('uid', '==', user.uid), where('courseId', '==', activeCourseId)), `student_progress_${activeCourseId}`, force) : Promise.resolve([])
+      ]);
 
-    // Fetch all available courses
-    const unsubscribeCourses = onSnapshot(collection(db, 'courses'), (snapshot) => {
-      const fetchedCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Filter by approved course IDs from user profile
-      const approvedCourses = fetchedCourses.filter(c => user.approvedCourseIds?.includes(c.id));
+      const approvedCourses = coursesData.filter((c: any) => user.approvedCourseIds?.includes(c.id));
       setCourses(approvedCourses);
-      
-      // Auto-select first course if none selected OR if current selected is not in approved list
       if (approvedCourses.length > 0) {
         if (!activeCourseId || !user.approvedCourseIds?.includes(activeCourseId)) {
           setActiveCourseId(approvedCourses[0].id);
@@ -61,152 +83,40 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       } else {
         setActiveCourseId(null);
       }
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'courses'));
 
-    // Check for feedback trigger (all materials + quiz for a chapter done)
-    const checkFeedbackStatus = async () => {
-      if (!activeCourseId || !user?.uid) return;
-      
-      // Basic logic: if student has a score for a chapter and has viewed materials
-      // For now, we'll check if they completed a quiz in the active course
-      const lastQuizScore = scores.find(s => s.courseId === activeCourseId);
-      if (lastQuizScore) {
-        // Only show if not already submitted for this course/chapter
-        const feedbackQuery = query(
-          collection(db, 'feedbacks'),
-          where('studentId', '==', user.uid),
-          where('courseId', '==', activeCourseId)
-        );
-        const feedbackSnap = await getDocs(feedbackQuery);
-        if (feedbackSnap.empty) {
-          setShowFeedbackModal(true);
-        }
+      setQuizzes(quizzesData);
+      setMaterials(materialsData);
+      setLiveClasses(liveData);
+      setRecordings(recordingsData);
+      setFlashcardSets(flashcardsData);
+      setExercises(exercisesData);
+      setKnowledgeVideos(knowledgeData);
+      setAnnouncements(announcementsData);
+      setScores(scoresData);
+      setChatMessages(chatData);
+      if (progressData.length > 0) {
+        setProgress(progressData[0]);
+      } else {
+        setProgress(null);
       }
-    };
-
-    if (scores.length > 0) {
-      checkFeedbackStatus();
-    }
-
-    // Only show published quizzes assigned to this student
-    const quizzesQuery = query(
-      collection(db, 'quizzes'),
-      where('status', '==', 'published'),
-      where('assignedTo', 'array-contains', user.uid)
-    );
-    
-    const unsubscribeQuizzes = onSnapshot(quizzesQuery, (snapshot) => {
-      setQuizzes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'quizzes'));
-
-    // Fetch assigned materials
-    const materialsQuery = query(
-      collection(db, 'materials'),
-      where('assignedTo', 'array-contains', user.uid)
-    );
-    const unsubscribeMaterials = onSnapshot(materialsQuery, (snapshot) => {
-      setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'materials'));
-
-    // Fetch assigned live classes
-    const liveClassesQuery = query(
-      collection(db, 'liveClasses'),
-      where('assignedTo', 'array-contains', user.uid)
-    );
-    const unsubscribeLiveClasses = onSnapshot(liveClassesQuery, (snapshot) => {
-      setLiveClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'liveClasses'));
-
-    // Fetch assigned recordings
-    const recordingsQuery = query(
-      collection(db, 'classRecordings'),
-      where('assignedTo', 'array-contains', user.uid)
-    );
-    const unsubscribeRecordings = onSnapshot(recordingsQuery, (snapshot) => {
-      setRecordings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'classRecordings'));
-
-    // Fetch assigned flashcard sets
-    const flashcardsQuery = query(
-      collection(db, 'flashcards'),
-      where('assignedTo', 'array-contains', user.uid)
-    );
-    const unsubscribeFlashcards = onSnapshot(flashcardsQuery, (snapshot) => {
-      setFlashcardSets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'flashcards'));
-
-    // Fetch Exercises - filter by assignedTo to respect security rules
-    const exercisesQuery = query(
-      collection(db, 'exercises'), 
-      where('assignedTo', 'array-contains', user.uid),
-      orderBy('createdAt', 'desc')
-    );
-    const unsubscribeExercises = onSnapshot(exercisesQuery, (snapshot) => {
-      setExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("Exercises listener error:", error);
-      handleFirestoreError(error, OperationType.LIST, 'exercises');
-    });
-
-    // Fetch Knowledge Videos (limited to 50 for performance)
-    const knowledgeQuery = query(collection(db, 'knowledgeVideos'), orderBy('createdAt', 'desc'), limit(50));
-    const unsubscribeKnowledge = onSnapshot(knowledgeQuery, (snapshot) => {
-      setKnowledgeVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'knowledgeVideos'));
-
-    // Fetch Announcements (limited to 20 for performance)
-    const announcementsQuery = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(20));
-    const unsubscribeAnnouncements = onSnapshot(announcementsQuery, (snapshot) => {
-      setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
-
-    // Fetch Chat Messages (limited to last 100 for quota)
-    const chatQuery = query(
-      collection(db, 'chatMessages'),
-      where('studentId', '==', user.uid),
-      orderBy('createdAt', 'asc'),
-      limitToLast(100)
-    );
-    const unsubscribeChat = onSnapshot(chatQuery, (snapshot) => {
-      setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'chatMessages'));
-
-    const scoresQuery = query(
-      collection(db, 'scores'), 
-      where('studentId', '==', user.uid),
-      orderBy('completedAt', 'desc')
-    );
-    const unsubscribeScores = onSnapshot(scoresQuery, (snapshot) => {
-      setScores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'scores'));
-
-    // Fetch progress
-    let unsubscribeProgress = () => {};
-    if (activeCourseId) {
-      const progressQuery = query(
-        collection(db, 'userProgress'),
-        where('uid', '==', user.uid),
-        where('courseId', '==', activeCourseId)
-      );
-      unsubscribeProgress = onSnapshot(progressQuery, (snapshot) => {
-        if (!snapshot.empty) {
-          setProgress({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
-        } else {
-          setProgress(null);
-        }
-      }, (error) => handleFirestoreError(error, OperationType.LIST, 'userProgress'));
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('Quota exceeded')) {
+        console.warn("Firestore Quota Exceeded in StudentDashboard static fetch.");
+        setLoading(false);
+      } else {
+        handleFirestoreError(err, OperationType.LIST, 'student_static_data');
+        setLoading(false);
+      }
     }
+  }, [user?.uid, activeCourseId, user.approvedCourseIds]);
 
-    return () => {
-      unsubscribeCourses();
-      unsubscribeQuizzes();
-      unsubscribeLiveClasses();
-      unsubscribeChat();
-      unsubscribeScores();
-      unsubscribeProgress();
-    };
-  }, [user?.uid, activeCourseId]); // Removed scores.length to avoid possible loops
+  React.useEffect(() => {
+    if (!user?.uid) return;
+    fetchStudentData();
+    return () => {};
+  }, [user?.uid, activeCourseId]); // Removed fetchStudentData from deps
+ // Removed scores.length to avoid possible loops
 
   const handleSendFeedback = async () => {
     if (!user?.uid || !activeCourseId) return;
@@ -429,13 +339,22 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 <p className="text-slate-500 font-medium italic">Welcome to <span className="text-slate-900 font-bold">Athlex Academy</span>. Your performance journey continues here.</p>
               </div>
               
-              <div className="flex items-center space-x-4">
-                <div className="text-right hidden sm:block">
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Progress</div>
-                  <div className="text-sm font-bold text-slate-900">{roadmapProgress}% Completed</div>
-                </div>
-                <div className="w-14 h-14 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-3 flex items-center justify-center">
-                  <Trophy className="h-8 w-8 text-blue-600" />
+              <div className="flex items-center space-x-6">
+                <button 
+                  onClick={() => fetchStudentData(true)}
+                  className="p-3 text-slate-400 hover:text-blue-600 transition-all hover:bg-white rounded-2xl group shadow-sm hover:shadow-md border border-transparent hover:border-slate-100"
+                  title="Refresh Content"
+                >
+                  <RefreshCw className="h-6 w-6 group-active:rotate-180 transition-transform duration-500" />
+                </button>
+                <div className="flex items-center space-x-4">
+                  <div className="text-right hidden sm:block">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Progress</div>
+                    <div className="text-sm font-bold text-slate-900">{roadmapProgress}% Completed</div>
+                  </div>
+                  <div className="w-14 h-14 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-3 flex items-center justify-center">
+                    <Trophy className="h-8 w-8 text-blue-600" />
+                  </div>
                 </div>
               </div>
             </div>

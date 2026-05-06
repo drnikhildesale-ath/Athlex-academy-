@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, getDocsCached } from '../lib/firebase';
 import { 
   ChevronRight, 
   Dumbbell, 
@@ -124,10 +124,8 @@ export default function LandingPage() {
   React.useEffect(() => {
     const fetchStories = async () => {
       try {
-        const { getDocs } = await import('firebase/firestore');
         const q = query(collection(db, 'successStories'), orderBy('order', 'asc'));
-        const snapshot = await getDocs(q);
-        const fetchedStories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const fetchedStories = await getDocsCached(q, 'landing_stories');
         setStories(fetchedStories.length > 0 ? fetchedStories : SUCCESS_STORIES);
       } catch (err) {
         console.error("Error fetching stories:", err);
