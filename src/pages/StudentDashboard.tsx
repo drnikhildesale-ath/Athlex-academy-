@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { collection, query, orderBy, onSnapshot, getDocs, where, limit, limitToLast } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, getDocsCached } from '../lib/firebase';
+import { collection, query, orderBy, getDocs, where, limit, limitToLast } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, getDocsCached, formatFirebaseDate } from '../lib/firebase';
 import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X, Megaphone, CheckCircle2, Activity, Lightbulb, MessageSquare, BookCheck, Sparkles, LogOut, ArrowRight, User, Lock, RefreshCw } from 'lucide-react';
 
 interface StudentDashboardProps {
@@ -516,7 +516,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                   <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{ann.content}</p>
                 </div>
                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest whitespace-nowrap">
-                  {new Date(ann.createdAt?.toDate()).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  {formatFirebaseDate(ann.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </div>
               </motion.div>
             ))}
@@ -753,7 +753,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                       </button>
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                      <span>{new Date(rec.createdAt?.toDate()).toLocaleDateString()}</span>
+                      <span>{formatFirebaseDate(rec.createdAt).toLocaleDateString()}</span>
                       <span className="flex items-center text-indigo-600 font-black">Play Session <ArrowRight className="h-3 w-3 ml-1" /></span>
                     </div>
                   </motion.div>
@@ -889,7 +889,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-slate-900 truncate group-hover:text-amber-600 transition-colors">{video.title}</div>
                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                      {video.category} • {new Date(video.createdAt?.toDate()).toLocaleDateString()}
+                      {video.category} • {formatFirebaseDate(video.createdAt).toLocaleDateString()}
                     </div>
                   </div>
                 </a>
@@ -924,7 +924,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                         <div>
                           <div className="text-sm font-bold">{item.title}</div>
                           <div className="text-[10px] text-red-100 font-bold uppercase tracking-widest">
-                            {item.scheduledAt ? new Date(item.scheduledAt.toDate()).toLocaleString() : 'Join Now'}
+                            {item.scheduledAt ? formatFirebaseDate(item.scheduledAt).toLocaleString() : 'Join Now'}
                           </div>
                         </div>
                       </div>
@@ -1110,7 +1110,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                         <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest">{score.score}/{score.totalQuestions} Marks</span>
                         <span className="text-[10px] text-slate-300">•</span>
                         <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                          {score.completedAt?.toDate ? new Date(score.completedAt.toDate()).toLocaleDateString() : 'Manual Record'}
+                          {score.completedAt ? formatFirebaseDate(score.completedAt).toLocaleDateString() : 'Manual Record'}
                         </div>
                       </div>
                     </div>
@@ -1273,7 +1273,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                       <div className={`text-[8px] mt-1 font-bold uppercase tracking-widest ${
                         msg.sender === 'student' ? 'text-indigo-200' : 'text-slate-400'
                       }`}>
-                        {msg.createdAt?.toDate ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending...'}
+                        {msg.createdAt ? formatFirebaseDate(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending...'}
                       </div>
                     </div>
                   </div>

@@ -87,6 +87,25 @@ export async function getDocsCached(query: Query<DocumentData>, cacheKey: string
   }
 }
 
+// Helper to safely convert cached or real timestamps to Date objects
+export function formatFirebaseDate(timestamp: any): Date {
+  if (!timestamp) return new Date();
+  
+  // If it's a Firestore Timestamp (has toDate method)
+  if (typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  
+  // If it's a cached timestamp (seconds/nanoseconds object or ISO string)
+  if (timestamp.seconds !== undefined) {
+    return new Date(timestamp.seconds * 1000);
+  }
+  
+  // Last resort: try standard Date constructor
+  const date = new Date(timestamp);
+  return isNaN(date.getTime()) ? new Date() : date;
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errorMessage = error instanceof Error ? error.message : String(error);
   const isQuotaError = errorMessage.includes('Quota exceeded') || errorMessage.includes('resource-exhausted');

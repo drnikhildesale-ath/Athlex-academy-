@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, where, setDoc, updateDoc, limit, limitToLast, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, getDocsCached } from '../lib/firebase';
+import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, where, setDoc, updateDoc, limit, limitToLast, getDocs } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, getDocsCached, formatFirebaseDate } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
 import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X, Award, Search, LayoutDashboard, Layout, RefreshCw } from 'lucide-react';
@@ -164,7 +164,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         announcementsData,
         chatData,
         notificationsData,
-        logsData
+        logsData,
+        scoresData
       ] = await Promise.all([
         getDocsCached(query(collection(db, 'quizzes'), orderBy('createdAt', 'desc'), limit(100)), 'admin_quizzes', force),
         getDocsCached(query(collection(db, 'materials'), orderBy('createdAt', 'desc'), limit(100)), 'admin_materials', force),
@@ -181,7 +182,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         getDocsCached(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(50)), 'admin_announcements', force),
         getDocsCached(query(collection(db, 'chatMessages'), orderBy('createdAt', 'asc'), limitToLast(100)), 'admin_chats', force),
         getDocsCached(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50)), 'admin_notifications', force),
-        isSuperAdmin ? getDocsCached(query(collection(db, 'activityLogs'), orderBy('createdAt', 'desc'), limit(100)), 'admin_logs', force) : Promise.resolve([])
+        isSuperAdmin ? getDocsCached(query(collection(db, 'activityLogs'), orderBy('createdAt', 'desc'), limit(100)), 'admin_logs', force) : Promise.resolve([]),
+        getDocsCached(query(collection(db, 'scores'), orderBy('completedAt', 'desc'), limit(200)), 'admin_all_scores', force)
       ]);
 
       setQuizzes(quizzesData);
@@ -206,6 +208,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setChatMessages(chatData);
       setNotifications(notificationsData);
       setActivityLogs(logsData);
+      setAllScores(scoresData);
       setAllUsers(studentsData); 
     } catch (err) {
       if (err instanceof Error && err.message.includes('Quota exceeded')) {
@@ -671,12 +674,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   React.useEffect(() => {
     if (!user) return;
-    // Fetch all scores (limited to 200 for performance/quota)
-    const scoresQuery = query(collection(db, 'scores'), orderBy('completedAt', 'desc'), limit(200));
-    const unsubscribeScores = onSnapshot(scoresQuery, (snapshot) => {
-      setAllScores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'scores'));
-    return () => unsubscribeScores();
+    // Score updates happen via fetchStaticData already, but we can call it here specifically if needed
   }, [user]);
 
   const handleRecordResult = async (e: React.FormEvent) => {
@@ -1120,7 +1118,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                                     {n.studentName} ({n.studentEmail}) just logged in for the first time.
                                   </div>
                                   <div className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-wider">
-                                    {n.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {formatFirebaseDate(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </div>
                                 </div>
                                 <button 
@@ -1324,7 +1322,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                                 <span className="text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1 rounded-full">{log.action} {log.targetType}</span>
                               </td>
                               <td className="px-8 py-6 text-[10px] font-black text-slate-400">
-                                {log.createdAt?.toDate().toLocaleTimeString()}
+                                {formatFirebaseDate(log.createdAt).toLocaleTimeString()}
                               </td>
                             </tr>
                           ))}
@@ -2298,7 +2296,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                               <div className={`text-[8px] mt-2 font-black uppercase tracking-widest ${
                                 msg.sender === 'admin' ? 'text-indigo-200' : 'text-slate-400'
                               }`}>
-                                {msg.createdAt?.toDate ? new Date(msg.createdAt.toDate()).toLocaleString() : 'Just now'}
+                                {formatFirebaseDate(msg.createdAt).toLocaleString()}
                               </div>
                             </div>
                           </div>
@@ -2578,8 +2576,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                             </div>
                             <div className="text-sm text-slate-500 font-medium mb-2">{log.details}</div>
                             <div className="flex items-center space-x-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                              <span className="flex items-center"><Calendar className="h-3 w-3 mr-1" /> {log.createdAt?.toDate().toLocaleDateString()}</span>
-                              <span className="flex items-center"><Clock className="h-3 w-3 mr-1" /> {log.createdAt?.toDate().toLocaleTimeString()}</span>
+                              <span className="flex items-center"><Calendar className="h-3 w-3 mr-1" /> {formatFirebaseDate(log.createdAt).toLocaleDateString()}</span>
+                              <span className="flex items-center"><Clock className="h-3 w-3 mr-1" /> {formatFirebaseDate(log.createdAt).toLocaleTimeString()}</span>
                               <span>Target: {log.targetType} ({log.targetId})</span>
                             </div>
                           </div>
@@ -3109,7 +3107,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{new Date(item.createdAt?.toDate()).toLocaleString()}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{formatFirebaseDate(item.createdAt).toLocaleString()}</p>
                           </div>
                         </div>
                         <button onClick={() => handleDeleteAnnouncement(item.id)} className="text-slate-300 hover:text-red-500 transition-colors">
@@ -3206,7 +3204,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         <div className="min-w-0">
                           <div className="flex items-center space-x-2">
                              <h3 className="font-bold text-slate-900 truncate">{student.displayName || student.email}</h3>
-                             {student.createdAt?.toDate && (Date.now() - student.createdAt.toDate().getTime()) < 24 * 60 * 60 * 1000 && (
+                             {student.createdAt && (Date.now() - formatFirebaseDate(student.createdAt).getTime()) < 24 * 60 * 60 * 1000 && (
                                <span className="px-2 py-0.5 bg-green-500 text-white text-[8px] font-black uppercase tracking-widest rounded-md animate-pulse">New</span>
                              )}
                           </div>
@@ -3312,7 +3310,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                               </div>
                             </td>
                             <td className="px-8 py-5 text-xs font-bold text-slate-400">
-                              {score.completedAt?.toDate ? new Date(score.completedAt.toDate()).toLocaleDateString() : 'N/A'}
+                               {score.completedAt ? formatFirebaseDate(score.completedAt).toLocaleDateString() : 'N/A'}
                             </td>
                             <td className="px-8 py-5 text-right">
                               <button 
@@ -3416,7 +3414,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
                       <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
                         <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
-                          Added {new Date(rec.createdAt?.toDate()).toLocaleDateString()}
+                          Added {formatFirebaseDate(rec.createdAt).toLocaleDateString()}
                         </div>
                         <a 
                           href={rec.videoUrl} 
@@ -3494,7 +3492,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           <div>
                             <h3 className="text-xl font-bold text-slate-900 mb-1">{material.title}</h3>
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                              Chapter {material.chapter} • {material.type === 'pdf' ? 'PDF' : 'Drive Link'} • Added {new Date(material.createdAt?.toDate()).toLocaleDateString()}
+                              Chapter {material.chapter} • {material.type === 'pdf' ? 'PDF' : 'Drive Link'} • Added {formatFirebaseDate(material.createdAt).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -3573,7 +3571,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                             <h3 className="text-xl font-bold text-slate-900 mb-1">{liveClass.title}</h3>
                             <div className="flex flex-col space-y-1">
                               <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                {liveClass.scheduledAt ? new Date(liveClass.scheduledAt.toDate()).toLocaleString() : 'Not scheduled'}
+                                {liveClass.scheduledAt ? formatFirebaseDate(liveClass.scheduledAt).toLocaleString() : 'Not scheduled'}
                               </div>
                               {liveClass.recordingLink && (
                                 <div className="flex items-center text-xs font-bold text-red-600 uppercase tracking-widest">
@@ -3657,7 +3655,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           <div>
                             <h3 className="text-xl font-bold text-slate-900 mb-1">{set.title}</h3>
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                              Chapter {set.chapter} • {set.cards?.length || 0} Cards • Published {new Date(set.createdAt?.toDate()).toLocaleDateString()}
+                              Chapter {set.chapter} • {set.cards?.length || 0} Cards • Published {formatFirebaseDate(set.createdAt).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -3748,7 +3746,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         </div>
                         <div className="flex flex-col items-end space-y-4">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            {new Date(inquiry.createdAt?.toDate()).toLocaleString()}
+                            {formatFirebaseDate(inquiry.createdAt).toLocaleString()}
                           </span>
                           <button
                             onClick={() => handleDeleteInquiry(inquiry.id)}
