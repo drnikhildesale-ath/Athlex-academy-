@@ -1,10 +1,22 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 const getApiKey = () => {
-  return process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  return (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 };
 
 const DEFAULT_MODEL = "gemini-3-flash-preview";
+
+function parseGeminiResponse<T>(text: string): T {
+  if (!text) return [] as unknown as T;
+  // Strip markdown code blocks if present
+  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (error) {
+    console.error("Gemini JSON Parse Error:", error, "Raw text:", text);
+    throw new Error("The AI response was not in the expected format. Please try again.");
+  }
+}
 
 export interface MCQ {
   question: string;
@@ -14,13 +26,7 @@ export interface MCQ {
 }
 
 export async function generateQuizFromNotes(notes: string, numQuestions: number = 10, difficulty: string = "Medium"): Promise<MCQ[]> {
-  const currentApiKey = getApiKey();
-  if (!currentApiKey) {
-    throw new Error("GEMINI_API_KEY is not set. Please provide an API key in the application settings.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey: currentApiKey });
-  const model = DEFAULT_MODEL;
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
   const prompt = `Generate a set of exactly ${numQuestions} multiple-choice questions (MCQs) at a ${difficulty} difficulty level based on the following study notes for the ACE-CPT certification. 
   Each question should have 4 options, a correct answer index (0-3), and a brief explanation.
@@ -28,37 +34,19 @@ export async function generateQuizFromNotes(notes: string, numQuestions: number 
   Notes:
   ${notes}
   
-  Return the result as a JSON array of objects.`;
+  Format Requirement:
+  Respond with ONLY a valid JSON array of objects, no markdown, no code blocks.
+  Each object must have: "question", "options" (array of 4), "correctAnswer" (0-3), and "explanation".`;
 
   try {
     const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              question: { type: Type.STRING, description: "The MCQ question text." },
-              options: { 
-                type: Type.ARRAY, 
-                items: { type: Type.STRING },
-                description: "Array of 4 possible answers."
-              },
-              correctAnswer: { type: Type.INTEGER, description: "Index of the correct answer (0-3)." },
-              explanation: { type: Type.STRING, description: "Brief explanation of why the answer is correct." }
-            },
-            required: ["question", "options", "correctAnswer", "explanation"]
-          }
-        }
-      }
+      model: DEFAULT_MODEL,
+      contents: [
+        { role: 'user', parts: [{ text: prompt }] }
+      ]
     });
-
-    const text = response.text;
-    if (!text) return [];
-    return JSON.parse(text.trim());
+    const text = response.text || "";
+    return parseGeminiResponse<MCQ[]>(text);
   } catch (error) {
     console.error("Gemini API Error:", error);
     throw error;
@@ -71,13 +59,7 @@ export interface Flashcard {
 }
 
 export async function generateFlashcardsFromNotes(notes: string, numCards: number = 10): Promise<Flashcard[]> {
-  const currentApiKey = getApiKey();
-  if (!currentApiKey) {
-    throw new Error("GEMINI_API_KEY is not set. Please provide an API key in the application settings.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey: currentApiKey });
-  const model = DEFAULT_MODEL;
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
   const prompt = `Generate a set of exactly ${numCards} educational flashcards based on the following study notes for the ACE-CPT certification. 
   Each flashcard should have a 'front' (the question or term) and a 'back' (the answer or definition).
@@ -86,45 +68,54 @@ export async function generateFlashcardsFromNotes(notes: string, numCards: numbe
   Notes:
   ${notes}
   
-  Return the result as a JSON array of objects.`;
+  Format Requirement:
+  Respond with ONLY a valid JSON array of objects, no markdown, no code blocks.
+  Example: [{"front": "Question", "back": "Answer"}]`;
 
   try {
     const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              front: { type: Type.STRING, description: "The term or question on the front of the card." },
-              back: { type: Type.STRING, description: "The definition or answer on the back of the card." }
-            },
-            required: ["front", "back"]
-          }
-        }
-      }
+      model: DEFAULT_MODEL,
+      contents: [
+        { role: 'user', parts: [{ text: prompt }] }
+      ]
     });
-
-    const text = response.text;
-    if (!text) return [];
-    return JSON.parse(text.trim());
+    const text = response.text || "";
+    return parseGeminiResponse<Flashcard[]>(text);
   } catch (error) {
     console.error("Flashcard Generation Error:", error);
     throw error;
   }
 }
 
-export async function summarizeNotes(notes: string): Promise<string> {
-  const currentApiKey = getApiKey();
-  if (!currentApiKey) {
-    throw new Error("GEMINI_API_KEY is not set. Please provide an API key in the application settings.");
-  }
+export async function generateFlashcardsFromTopic(topic: string, difficulty: string = "Intermediate", numCards: number = 10): Promise<Flashcard[]> {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
-  const ai = new GoogleGenAI({ apiKey: currentApiKey });
-  const model = DEFAULT_MODEL;
+  const prompt = `Generate a set of exactly ${numCards} educational flashcards on the topic "${topic}" at a ${difficulty} level for fitness and sports science students (specifically aligned with ACE-CPT standards). 
+  Each flashcard should have a 'front' (the question or term) and a 'back' (the answer or definition).
+  
+  Format Requirement: 
+  Respond with ONLY a valid JSON array of objects, no markdown, no code blocks. 
+  Each object must have exactly two keys: "front" and "back". 
+  Example: [{"front": "Question text", "back": "Answer text"}]
+  Ensure the content is scientifically accurate and professional.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
+      contents: [
+        { role: 'user', parts: [{ text: prompt }] }
+      ]
+    });
+    const text = response.text || "";
+    return parseGeminiResponse<Flashcard[]>(text);
+  } catch (error) {
+    console.error("Flashcard Topic Generation Error:", error);
+    throw error;
+  }
+}
+
+export async function summarizeNotes(notes: string): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
   const prompt = `Summarize the following study notes into 15-20 concise bullet points. 
   Focus on key concepts, definitions, and important facts for the ACE-CPT certification.
@@ -135,10 +126,11 @@ export async function summarizeNotes(notes: string): Promise<string> {
   Return the bullet points as a plain text list.`;
 
   const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
+    model: DEFAULT_MODEL,
+    contents: [
+      { role: 'user', parts: [{ text: prompt }] }
+    ]
   });
-
   return response.text || "Failed to generate summary.";
 }
 
@@ -148,22 +140,9 @@ export interface ChatMessage {
 }
 
 export async function getChatResponse(message: string, history: ChatMessage[] = []): Promise<string> {
-  const currentApiKey = getApiKey();
-  if (!currentApiKey) {
-    throw new Error("GEMINI_API_KEY is not set. Please provide an API key in the application settings.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey: currentApiKey });
-
-  try {
-    const response = await ai.models.generateContent({
-      model: DEFAULT_MODEL,
-      contents: [
-        ...history,
-        { role: 'user', parts: [{ text: message }] }
-      ],
-      config: {
-        systemInstruction: `You are the ultimate expert assistant for Athlex Academy, a premier institution for fitness and sports science education. 
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  
+  const systemInstruction = `You are the ultimate expert assistant for Athlex Academy, a premier institution for fitness and sports science education. 
         Your goal is to be helpful, professional, encouraging, and deeply knowledgeable about our academy and the fitness industry (specifically ACE-CPT).
 
         Athlex Academy Identity:
@@ -185,7 +164,17 @@ export async function getChatResponse(message: string, history: ChatMessage[] = 
 
         Context: 
         - You are currently inside the Athlex Academy platform.
-        - If they seem confused, suggest they check the "Study Materials" or "Signature Quizzes" in their dashboard.`,
+        - If they seem confused, suggest they check the "Study Materials" or "Signature Quizzes" in their dashboard.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
+      contents: [
+        ...history,
+        { role: 'user', parts: [{ text: message }] }
+      ],
+      config: {
+        systemInstruction
       }
     });
     return response.text || "I'm sorry, I couldn't generate a response.";

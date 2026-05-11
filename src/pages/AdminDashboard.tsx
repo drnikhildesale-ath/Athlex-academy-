@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, where, setDoc, updateDoc, limit, limitToLast, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, getDocsCached, formatFirebaseDate } from '../lib/firebase';
-import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard } from '../services/gemini';
+import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard, generateFlashcardsFromTopic } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
 import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X, Award, Search, LayoutDashboard, Layout, RefreshCw } from 'lucide-react';
 
@@ -112,9 +112,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   // Flashcard Form
   const [flashcardTitle, setFlashcardTitle] = React.useState('');
+  const [flashcardTopic, setFlashcardTopic] = React.useState('');
+  const [flashcardDifficulty, setFlashcardDifficulty] = React.useState('Intermediate');
   const [flashcardChapter, setFlashcardChapter] = React.useState('1');
   const [numFlashcards, setNumFlashcards] = React.useState(10);
   const [flashcardNotes, setFlashcardNotes] = React.useState('');
+  const [flashcardSource, setFlashcardSource] = React.useState<'notes' | 'topic'>('topic');
   const [draftFlashcards, setDraftFlashcards] = React.useState<Flashcard[] | null>(null);
   const [showFlashcardReview, setShowFlashcardReview] = React.useState(false);
 
@@ -257,29 +260,15 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const handleSummarize = async () => {
     if (!notes) return;
 
-    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-      await window.aistudio.openSelectKey();
-    }
-
     setSummarizing(true);
     setStatus(null);
     try {
-      if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-        await window.aistudio.openSelectKey();
-        throw new Error("Please select an API key to enable AI features.");
-      }
-
       const summary = await summarizeNotes(notes);
       setNotes(summary);
       setStatus({ type: 'success', message: 'Notes summarized into key bullet points!' });
     } catch (err: any) {
       console.error("Summarization Error:", err);
-      if (err.message?.includes("GEMINI_API_KEY") && window.aistudio) {
-        setStatus({ type: 'error', message: "API Key missing. Opening key selection..." });
-        await window.aistudio.openSelectKey();
-      } else {
-        setStatus({ type: 'error', message: 'Failed to summarize notes.' });
-      }
+      setStatus({ type: 'error', message: 'Failed to summarize notes.' });
     } finally {
       setSummarizing(false);
     }
@@ -289,19 +278,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     e.preventDefault();
     if (!notes || !quizTitle) return;
 
-    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-      await window.aistudio.openSelectKey();
-    }
-
     setGenerating(true);
     setStatus(null);
     try {
       if (creationMode === 'ai') {
-        if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-          await window.aistudio.openSelectKey();
-          throw new Error("Please select an API key to enable AI features.");
-        }
-
         const generatedQuestions = await generateQuizFromNotes(notes, numQuestions, difficulty);
         
         if (generatedQuestions.length === 0) {
@@ -319,15 +299,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       }
     } catch (err: any) {
       console.error("Quiz Generation Error:", err);
-      if (err.message?.includes("GEMINI_API_KEY") && window.aistudio) {
-        setStatus({ type: 'error', message: "API Key missing. Opening key selection..." });
-        await window.aistudio.openSelectKey();
-      } else if (err.message?.includes("Requested entity was not found") && window.aistudio) {
-        setStatus({ type: 'error', message: "Model not found. Please select a valid API key from a paid project." });
-        await window.aistudio.openSelectKey();
-      } else {
-        setStatus({ type: 'error', message: err.message || "Failed to generate quiz. Please check your notes and try again." });
-      }
+      setStatus({ type: 'error', message: err.message || "Failed to generate quiz. Please check your notes and try again." });
     } finally {
       setGenerating(false);
     }
@@ -563,22 +535,21 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   const handleGenerateFlashcardDraft = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!flashcardNotes || !flashcardTitle) return;
-
-    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-      await window.aistudio.openSelectKey();
-    }
+    if (!flashcardTitle) return;
+    if (creationMode === 'ai' && flashcardSource === 'notes' && !flashcardNotes) return;
+    if (creationMode === 'ai' && flashcardSource === 'topic' && !flashcardTopic) return;
 
     setGenerating(true);
     setStatus(null);
     try {
       if (creationMode === 'ai') {
-        if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-          await window.aistudio.openSelectKey();
-          throw new Error("Please select an API key to enable AI features.");
+        let generatedCards: Flashcard[] = [];
+        if (flashcardSource === 'notes') {
+          generatedCards = await generateFlashcardsFromNotes(flashcardNotes, numFlashcards);
+        } else {
+          generatedCards = await generateFlashcardsFromTopic(flashcardTopic, flashcardDifficulty, numFlashcards);
         }
-
-        const generatedCards = await generateFlashcardsFromNotes(flashcardNotes, numFlashcards);
+        
         setDraftFlashcards(generatedCards);
         setShowFlashcardReview(true);
       } else {
@@ -590,12 +561,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       }
     } catch (err: any) {
       console.error("Flashcard Generation Error:", err);
-      if (err.message?.includes("GEMINI_API_KEY") && window.aistudio) {
-        setStatus({ type: 'error', message: "API Key missing. Opening key selection..." });
-        await window.aistudio.openSelectKey();
-      } else {
-        setStatus({ type: 'error', message: err.message || "Failed to generate flashcards." });
-      }
+      setStatus({ type: 'error', message: err.message || "Failed to generate flashcards." });
     } finally {
       setGenerating(false);
     }
@@ -606,16 +572,11 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       setStatus({ type: 'error', message: "Title and flashcards are required." });
       return;
     }
-    if (!activeCourseId) {
-      setStatus({ type: 'error', message: "Please select a target course." });
-      return;
-    }
-
     try {
       await addDoc(collection(db, 'flashcards'), {
         title: flashcardTitle,
         chapter: flashcardChapter,
-        courseId: activeCourseId,
+        courseId: activeCourseId || null,
         cards: draftFlashcards,
         assignedTo: [],
         createdAt: serverTimestamp(),
@@ -624,6 +585,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
       setFlashcardNotes('');
       setFlashcardTitle('');
+      setFlashcardTopic('');
+      setManualFlashcards([]);
       setDraftFlashcards(null);
       setShowFlashcardReview(false);
       setStatus({ type: 'success', message: "Flashcard set published successfully!" });
@@ -1253,32 +1216,73 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       ) : showFlashcardReview && draftFlashcards ? (
         <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl mb-12 animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Review Generated Flashcards: {flashcardTitle}</h2>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Review Generated Flashcards: {flashcardTitle}</h2>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Review, Edit, or Remove cards before publishing to students</p>
+            </div>
             <div className="flex space-x-4">
               <button
                 onClick={() => setShowFlashcardReview(false)}
-                className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all font-serif italic"
               >
-                Back to Edit
+                Back to Draft
               </button>
               <button
                 onClick={handleSaveFlashcards}
                 className="px-10 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
               >
-                Publish Flashcard Set
+                Publish All Flashcards
               </button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {draftFlashcards.map((card, idx) => (
-              <div key={idx} className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col h-full">
-                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Card {idx + 1}</div>
-                <div className="font-bold text-slate-900 mb-4 pb-4 border-b border-white/50">{card.front}</div>
-                <div className="text-slate-600 text-sm font-medium">{card.back}</div>
+              <div key={idx} className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 relative group transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                <button
+                  onClick={() => setDraftFlashcards(draftFlashcards.filter((_, i) => i !== idx))}
+                  className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-6 bg-blue-50/50 py-1 px-3 rounded-full inline-block">Card {idx + 1}</div>
+                
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-400 uppercase tracking-tight mb-2 ml-1">Front (Question/Term)</label>
+                    <textarea
+                      value={card.front}
+                      onChange={(e) => {
+                        const updated = [...draftFlashcards];
+                        updated[idx].front = e.target.value;
+                        setDraftFlashcards(updated);
+                      }}
+                      className="w-full bg-white/50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all resize-none h-24"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-400 uppercase tracking-tight mb-2 ml-1">Back (Answer/Definition)</label>
+                    <textarea
+                      value={card.back}
+                      onChange={(e) => {
+                        const updated = [...draftFlashcards];
+                        updated[idx].back = e.target.value;
+                        setDraftFlashcards(updated);
+                      }}
+                      className="w-full bg-white/50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all resize-none h-32"
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
+          
+          {draftFlashcards.length === 0 && (
+            <div className="py-20 text-center bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200">
+              <BookCheck className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-400 font-bold uppercase tracking-widest">No cards remaining. Please go back or add some manually.</p>
+            </div>
+          )}
         </div>
       ) : activeTab === 'overview' ? (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1604,6 +1608,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   </div>
 
                   {quizType === 'ai' ? (
+                    creationMode === 'ai' ? (
                     <>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -1682,7 +1687,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         />
                       </div>
                     </>
-                  ) : quizType === 'ai' && creationMode === 'manual' ? (
+                  ) : (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Question Bank ({manualQuestions.length})</label>
@@ -1785,7 +1790,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         />
                       </div>
                     </div>
-                  ) : (
+                  )) : (
                     <div>
                       <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Google Form URL</label>
                       <input
@@ -2526,12 +2531,11 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
                 <form onSubmit={handleGenerateFlashcardDraft} className="space-y-6">
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Target Course</label>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Target Course (Optional)</label>
                     <select
                       value={activeCourseId}
                       onChange={(e) => setActiveCourseId(e.target.value)}
                       className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
-                      required
                     >
                       <option value="">Select a Course...</option>
                       {courses.map(c => (
@@ -2586,36 +2590,100 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
                   {creationMode === 'ai' ? (
                     <>
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Number of Cards</label>
-                        <input
-                          type="number"
-                          min="5"
-                          max="30"
-                          value={isNaN(numFlashcards) ? '' : numFlashcards}
-                          onChange={(e) => setNumFlashcards(parseInt(e.target.value))}
-                          className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Chapter Notes</label>
+                      <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-6">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4 text-center">AI Source</label>
+                        <div className="grid grid-cols-2 gap-4">
                           <button
                             type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors"
+                            onClick={() => setFlashcardSource('topic')}
+                            className={`p-4 rounded-2xl border transition-all flex flex-col items-center space-y-2 ${
+                              flashcardSource === 'topic' 
+                                ? 'bg-white border-blue-200 shadow-lg shadow-blue-500/5 text-blue-600 scale-[1.02]' 
+                                : 'bg-transparent border-transparent text-slate-400 grayscale'
+                            }`}
                           >
-                            Upload PDF
+                            <Lightbulb className="h-6 w-6" />
+                            <span className="text-xs font-bold font-serif italic">From Topic</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFlashcardSource('notes')}
+                            className={`p-4 rounded-2xl border transition-all flex flex-col items-center space-y-2 ${
+                              flashcardSource === 'notes' 
+                                ? 'bg-white border-blue-200 shadow-lg shadow-blue-500/5 text-blue-600 scale-[1.02]' 
+                                : 'bg-transparent border-transparent text-slate-400 grayscale'
+                            }`}
+                          >
+                            <FileText className="h-6 w-6" />
+                            <span className="text-xs font-bold font-serif italic">From PDF/Notes</span>
                           </button>
                         </div>
-                        <textarea
-                          value={flashcardNotes}
-                          onChange={(e) => setFlashcardNotes(e.target.value)}
-                          placeholder="Paste notes for the card content..."
-                          className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium h-48 resize-none"
-                          required
-                        />
+                      </div>
+
+                      {flashcardSource === 'topic' ? (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                          <div>
+                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Generation Topic</label>
+                            <input
+                              type="text"
+                              value={flashcardTopic}
+                              onChange={(e) => setFlashcardTopic(e.target.value)}
+                              placeholder="e.g. Skeletal Muscle Anatomy"
+                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Difficulty Level</label>
+                            <select
+                              value={flashcardDifficulty}
+                              onChange={(e) => setFlashcardDifficulty(e.target.value)}
+                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium appearance-none"
+                            >
+                              <option value="Basic">Basic Concepts</option>
+                              <option value="Intermediate">Intermediate (ACE-Standard)</option>
+                              <option value="Advanced">Advanced / Technical</option>
+                            </select>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Chapter Notes</label>
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors"
+                              >
+                                Upload PDF
+                              </button>
+                            </div>
+                            <textarea
+                              value={flashcardNotes}
+                              onChange={(e) => setFlashcardNotes(e.target.value)}
+                              placeholder="Paste notes for the card content..."
+                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium h-48 resize-none"
+                              required
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Card Count</label>
+                        <div className="flex items-center space-x-4 h-14">
+                          <input
+                            type="range"
+                            min="5"
+                            max="20"
+                            step="1"
+                            value={numFlashcards}
+                            onChange={(e) => setNumFlashcards(parseInt(e.target.value))}
+                            className="flex-1 accent-blue-600 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="w-12 text-center font-black text-blue-600 text-lg">{numFlashcards}</span>
+                        </div>
                       </div>
                     </>
                   ) : (
