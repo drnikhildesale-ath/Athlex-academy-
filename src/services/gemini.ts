@@ -1,6 +1,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const apiKey = process.env.GEMINI_API_KEY;
+const getApiKey = () => {
+  return process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+};
+
+const DEFAULT_MODEL = "gemini-3-flash-preview";
 
 export interface MCQ {
   question: string;
@@ -10,13 +14,13 @@ export interface MCQ {
 }
 
 export async function generateQuizFromNotes(notes: string, numQuestions: number = 10, difficulty: string = "Medium"): Promise<MCQ[]> {
-  const currentApiKey = process.env.GEMINI_API_KEY;
+  const currentApiKey = getApiKey();
   if (!currentApiKey) {
-    throw new Error("GEMINI_API_KEY is not set.");
+    throw new Error("GEMINI_API_KEY is not set. Please provide an API key in the application settings.");
   }
 
   const ai = new GoogleGenAI({ apiKey: currentApiKey });
-  const model = "gemini-3-flash-preview";
+  const model = DEFAULT_MODEL;
 
   const prompt = `Generate a set of exactly ${numQuestions} multiple-choice questions (MCQs) at a ${difficulty} difficulty level based on the following study notes for the ACE-CPT certification. 
   Each question should have 4 options, a correct answer index (0-3), and a brief explanation.
@@ -67,13 +71,13 @@ export interface Flashcard {
 }
 
 export async function generateFlashcardsFromNotes(notes: string, numCards: number = 10): Promise<Flashcard[]> {
-  const currentApiKey = process.env.GEMINI_API_KEY;
+  const currentApiKey = getApiKey();
   if (!currentApiKey) {
-    throw new Error("GEMINI_API_KEY is not set.");
+    throw new Error("GEMINI_API_KEY is not set. Please provide an API key in the application settings.");
   }
 
   const ai = new GoogleGenAI({ apiKey: currentApiKey });
-  const model = "gemini-3-flash-preview";
+  const model = DEFAULT_MODEL;
 
   const prompt = `Generate a set of exactly ${numCards} educational flashcards based on the following study notes for the ACE-CPT certification. 
   Each flashcard should have a 'front' (the question or term) and a 'back' (the answer or definition).
@@ -114,13 +118,13 @@ export async function generateFlashcardsFromNotes(notes: string, numCards: numbe
 }
 
 export async function summarizeNotes(notes: string): Promise<string> {
-  const currentApiKey = process.env.GEMINI_API_KEY;
+  const currentApiKey = getApiKey();
   if (!currentApiKey) {
-    throw new Error("GEMINI_API_KEY is not set.");
+    throw new Error("GEMINI_API_KEY is not set. Please provide an API key in the application settings.");
   }
 
   const ai = new GoogleGenAI({ apiKey: currentApiKey });
-  const model = "gemini-3-flash-preview";
+  const model = DEFAULT_MODEL;
 
   const prompt = `Summarize the following study notes into 15-20 concise bullet points. 
   Focus on key concepts, definitions, and important facts for the ACE-CPT certification.
@@ -144,16 +148,16 @@ export interface ChatMessage {
 }
 
 export async function getChatResponse(message: string, history: ChatMessage[] = []): Promise<string> {
-  const currentApiKey = process.env.GEMINI_API_KEY;
+  const currentApiKey = getApiKey();
   if (!currentApiKey) {
-    throw new Error("GEMINI_API_KEY is not set.");
+    throw new Error("GEMINI_API_KEY is not set. Please provide an API key in the application settings.");
   }
 
   const ai = new GoogleGenAI({ apiKey: currentApiKey });
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: DEFAULT_MODEL,
       contents: [
         ...history,
         { role: 'user', parts: [{ text: message }] }

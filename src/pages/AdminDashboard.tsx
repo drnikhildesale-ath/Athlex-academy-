@@ -105,6 +105,11 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   const [newMessage, setNewMessage] = React.useState('');
 
+  // Manual Mode States
+  const [creationMode, setCreationMode] = React.useState<'ai' | 'manual'>('manual');
+  const [manualFlashcards, setManualFlashcards] = React.useState<{ front: string; back: string }[]>([]);
+  const [manualQuestions, setManualQuestions] = React.useState<MCQ[]>([]);
+
   // Flashcard Form
   const [flashcardTitle, setFlashcardTitle] = React.useState('');
   const [flashcardChapter, setFlashcardChapter] = React.useState('1');
@@ -259,12 +264,22 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     setSummarizing(true);
     setStatus(null);
     try {
+      if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+        await window.aistudio.openSelectKey();
+        throw new Error("Please select an API key to enable AI features.");
+      }
+
       const summary = await summarizeNotes(notes);
       setNotes(summary);
       setStatus({ type: 'success', message: 'Notes summarized into key bullet points!' });
     } catch (err: any) {
       console.error("Summarization Error:", err);
-      setStatus({ type: 'error', message: 'Failed to summarize notes.' });
+      if (err.message?.includes("GEMINI_API_KEY") && window.aistudio) {
+        setStatus({ type: 'error', message: "API Key missing. Opening key selection..." });
+        await window.aistudio.openSelectKey();
+      } else {
+        setStatus({ type: 'error', message: 'Failed to summarize notes.' });
+      }
     } finally {
       setSummarizing(false);
     }
@@ -281,17 +296,33 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     setGenerating(true);
     setStatus(null);
     try {
-      const generatedQuestions = await generateQuizFromNotes(notes, numQuestions, difficulty);
-      
-      if (generatedQuestions.length === 0) {
-        throw new Error("No questions were generated. Please try again with more detailed notes.");
-      }
+      if (creationMode === 'ai') {
+        if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+          await window.aistudio.openSelectKey();
+          throw new Error("Please select an API key to enable AI features.");
+        }
 
-      setDraftQuiz(generatedQuestions);
-      setShowReview(true);
+        const generatedQuestions = await generateQuizFromNotes(notes, numQuestions, difficulty);
+        
+        if (generatedQuestions.length === 0) {
+          throw new Error("No questions were generated. Please try again with more detailed notes.");
+        }
+
+        setDraftQuiz(generatedQuestions);
+        setShowReview(true);
+      } else {
+        if (manualQuestions.length === 0) {
+          throw new Error("Please add at least one question manually.");
+        }
+        setDraftQuiz(manualQuestions);
+        setShowReview(true);
+      }
     } catch (err: any) {
       console.error("Quiz Generation Error:", err);
-      if (err.message?.includes("Requested entity was not found") && window.aistudio) {
+      if (err.message?.includes("GEMINI_API_KEY") && window.aistudio) {
+        setStatus({ type: 'error', message: "API Key missing. Opening key selection..." });
+        await window.aistudio.openSelectKey();
+      } else if (err.message?.includes("Requested entity was not found") && window.aistudio) {
         setStatus({ type: 'error', message: "Model not found. Please select a valid API key from a paid project." });
         await window.aistudio.openSelectKey();
       } else {
@@ -541,12 +572,30 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     setGenerating(true);
     setStatus(null);
     try {
-      const generatedCards = await generateFlashcardsFromNotes(flashcardNotes, numFlashcards);
-      setDraftFlashcards(generatedCards);
-      setShowFlashcardReview(true);
+      if (creationMode === 'ai') {
+        if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+          await window.aistudio.openSelectKey();
+          throw new Error("Please select an API key to enable AI features.");
+        }
+
+        const generatedCards = await generateFlashcardsFromNotes(flashcardNotes, numFlashcards);
+        setDraftFlashcards(generatedCards);
+        setShowFlashcardReview(true);
+      } else {
+        if (manualFlashcards.length === 0) {
+          throw new Error("Please add at least one flashcard manually.");
+        }
+        setDraftFlashcards(manualFlashcards);
+        setShowFlashcardReview(true);
+      }
     } catch (err: any) {
       console.error("Flashcard Generation Error:", err);
-      setStatus({ type: 'error', message: err.message || "Failed to generate flashcards." });
+      if (err.message?.includes("GEMINI_API_KEY") && window.aistudio) {
+        setStatus({ type: 'error', message: "API Key missing. Opening key selection..." });
+        await window.aistudio.openSelectKey();
+      } else {
+        setStatus({ type: 'error', message: err.message || "Failed to generate flashcards." });
+      }
     } finally {
       setGenerating(false);
     }
@@ -1520,6 +1569,28 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     />
                   </div>
 
+                  {quizType === 'ai' && (
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Creation Mode</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCreationMode('ai')}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all ${creationMode === 'ai' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 text-slate-500'}`}
+                        >
+                          <Sparkles className="h-3 w-3 inline mr-1" /> AI Generated
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCreationMode('manual')}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all ${creationMode === 'manual' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 text-slate-500'}`}
+                        >
+                          <Plus className="h-3 w-3 inline mr-1" /> Manual Write
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">ACE Chapter(s)</label>
                     <input
@@ -1611,6 +1682,109 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         />
                       </div>
                     </>
+                  ) : quizType === 'ai' && creationMode === 'manual' ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Question Bank ({manualQuestions.length})</label>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const newQ: MCQ = {
+                              question: '',
+                              options: ['', '', '', ''],
+                              correctAnswer: 0,
+                              explanation: ''
+                            };
+                            setManualQuestions([...manualQuestions, newQ]);
+                          }}
+                          className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline"
+                        >
+                          + Add Question
+                        </button>
+                      </div>
+                      <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        {manualQuestions.map((q, qIdx) => (
+                          <div key={qIdx} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group">
+                            <button 
+                              type="button"
+                              onClick={() => setManualQuestions(manualQuestions.filter((_, i) => i !== qIdx))}
+                              className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase tracking-tight mb-2">Question {qIdx + 1}</label>
+                            <textarea
+                              value={q.question}
+                              onChange={(e) => {
+                                const updated = [...manualQuestions];
+                                updated[qIdx].question = e.target.value;
+                                setManualQuestions(updated);
+                              }}
+                              placeholder="What is the recommended protein intake for athletes?"
+                              className="w-full px-4 py-3 rounded-xl bg-white border border-slate-100 mb-4 focus:ring-1 focus:ring-blue-500/20 text-sm font-medium"
+                              required
+                            />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                              {q.options.map((opt, oIdx) => (
+                                <div key={oIdx} className="flex items-center space-x-2">
+                                  <input 
+                                    type="radio" 
+                                    name={`correct-${qIdx}`}
+                                    checked={q.correctAnswer === oIdx}
+                                    onChange={() => {
+                                      const updated = [...manualQuestions];
+                                      updated[qIdx].correctAnswer = oIdx;
+                                      setManualQuestions(updated);
+                                    }}
+                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={opt}
+                                    onChange={(e) => {
+                                      const updated = [...manualQuestions];
+                                      updated[qIdx].options[oIdx] = e.target.value;
+                                      setManualQuestions(updated);
+                                    }}
+                                    placeholder={`Option ${oIdx + 1}`}
+                                    className="flex-1 px-3 py-2 rounded-lg bg-white border border-slate-100 text-xs font-medium"
+                                    required
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <input
+                              type="text"
+                              value={q.explanation}
+                              onChange={(e) => {
+                                const updated = [...manualQuestions];
+                                updated[qIdx].explanation = e.target.value;
+                                setManualQuestions(updated);
+                              }}
+                              placeholder="Explanation (shown after answering)"
+                              className="w-full px-4 py-2 rounded-xl bg-white/50 border border-slate-100 text-[10px] font-medium"
+                            />
+                          </div>
+                        ))}
+                        {manualQuestions.length === 0 && (
+                          <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                            <Plus className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                            <p className="text-xs text-slate-400 font-medium">Click "+ Add Question" to start writing.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Points/Q</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={isNaN(pointsPerQuestion) ? '' : pointsPerQuestion}
+                          onChange={(e) => setPointsPerQuestion(parseInt(e.target.value))}
+                          className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                        />
+                      </div>
+                    </div>
                   ) : (
                     <div>
                       <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Google Form URL</label>
@@ -1642,12 +1816,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     {generating ? (
                       <>
                         <Loader2 className="h-6 w-6 mr-3 animate-spin" />
-                        Curating Quiz...
+                        {creationMode === 'ai' ? 'Curating Quiz...' : 'Preparing Preview...'}
                       </>
                     ) : (
                       <>
-                        <Plus className="h-6 w-6 mr-3 group-hover:rotate-90 transition-transform" />
-                        {quizType === 'ai' ? 'Generate Draft' : 'Publish Quiz'}
+                        {creationMode === 'ai' ? <Plus className="h-6 w-6 mr-3 group-hover:rotate-90 transition-transform" /> : <ChevronRight className="h-6 w-6 mr-3" />}
+                        {quizType === 'ai' ? (creationMode === 'ai' ? 'Generate Draft' : 'Preview & Review') : 'Publish Quiz'}
                       </>
                     )}
                   </button>
@@ -2391,36 +2565,117 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Number of Cards</label>
-                    <input
-                      type="number"
-                      min="5"
-                      max="30"
-                      value={isNaN(numFlashcards) ? '' : numFlashcards}
-                      onChange={(e) => setNumFlashcards(parseInt(e.target.value))}
-                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Chapter Notes</label>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Creation Mode</label>
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors"
+                        onClick={() => setCreationMode('ai')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${creationMode === 'ai' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 text-slate-500'}`}
                       >
-                        Upload PDF
+                        <Sparkles className="h-3 w-3 inline mr-1" /> AI Generated
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreationMode('manual')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${creationMode === 'manual' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 text-slate-500'}`}
+                      >
+                        <Plus className="h-3 w-3 inline mr-1" /> Manual Entry
                       </button>
                     </div>
-                    <textarea
-                      value={flashcardNotes}
-                      onChange={(e) => setFlashcardNotes(e.target.value)}
-                      placeholder="Paste notes for the card content..."
-                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium h-48 resize-none"
-                      required
-                    />
                   </div>
+
+                  {creationMode === 'ai' ? (
+                    <>
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Number of Cards</label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="30"
+                          value={isNaN(numFlashcards) ? '' : numFlashcards}
+                          onChange={(e) => setNumFlashcards(parseInt(e.target.value))}
+                          className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Chapter Notes</label>
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors"
+                          >
+                            Upload PDF
+                          </button>
+                        </div>
+                        <textarea
+                          value={flashcardNotes}
+                          onChange={(e) => setFlashcardNotes(e.target.value)}
+                          placeholder="Paste notes for the card content..."
+                          className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium h-48 resize-none"
+                          required
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Flashcards ({manualFlashcards.length})</label>
+                        <button 
+                          type="button"
+                          onClick={() => setManualFlashcards([...manualFlashcards, { front: '', back: '' }])}
+                          className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline"
+                        >
+                          + Add Card
+                        </button>
+                      </div>
+                      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        {manualFlashcards.map((card, idx) => (
+                          <div key={idx} className="p-5 bg-slate-50 rounded-2xl border border-slate-200 relative group">
+                            <button 
+                              type="button"
+                              onClick={() => setManualFlashcards(manualFlashcards.filter((_, i) => i !== idx))}
+                              className="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <div className="grid grid-cols-1 gap-3">
+                              <input
+                                type="text"
+                                value={card.front}
+                                onChange={(e) => {
+                                  const updated = [...manualFlashcards];
+                                  updated[idx].front = e.target.value;
+                                  setManualFlashcards(updated);
+                                }}
+                                placeholder="Front side (Term/Question)"
+                                className="w-full px-4 py-2 rounded-xl bg-white border border-slate-100 text-sm font-bold"
+                                required
+                              />
+                              <textarea
+                                value={card.back}
+                                onChange={(e) => {
+                                  const updated = [...manualFlashcards];
+                                  updated[idx].back = e.target.value;
+                                  setManualFlashcards(updated);
+                                }}
+                                placeholder="Back side (Definition/Answer)"
+                                className="w-full px-4 py-2 rounded-xl bg-white border border-slate-100 text-xs font-medium h-20 resize-none"
+                                required
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {manualFlashcards.length === 0 && (
+                          <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                            <Plus className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                            <p className="text-xs text-slate-400 font-medium">No cards added yet.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {status && activeTab === 'flashcards' && (
                     <div className={`p-4 rounded-2xl flex items-center space-x-3 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
@@ -2439,9 +2694,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     {generating ? (
                       <Loader2 className="h-6 w-6 animate-spin mr-3" />
                     ) : (
-                      <Sparkles className="h-5 w-5 mr-3" />
+                      creationMode === 'ai' ? <Sparkles className="h-5 w-5 mr-3" /> : <ChevronRight className="h-6 w-6 mr-3" />
                     )}
-                    {generating ? 'Generating...' : 'Generate Flashcards'}
+                    {generating ? 'Processing...' : (creationMode === 'ai' ? 'Generate Flashcards' : 'Review Cards')}
                   </button>
                 </form>
               </div>
