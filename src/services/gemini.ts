@@ -1,7 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
 
 const DEFAULT_MODEL = "gemini-2.0-flash";
-const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY });
+
+let aiInstance: GoogleGenAI | null = null;
+
+const getAiClient = () => {
+  if (!aiInstance) {
+    const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (process as any).env?.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not configured. Please set it in your environment/settings.");
+    }
+    aiInstance = new GoogleGenAI(apiKey);
+  }
+  return aiInstance;
+};
 
 function parseGeminiResponse<T>(text: string): T {
   if (!text) return [] as unknown as T;
@@ -34,13 +46,13 @@ export async function generateQuizFromNotes(notes: string, numQuestions: number 
   Each object must have: "question", "options" (array of 4), "correctAnswer" (0-3), and "explanation".`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: DEFAULT_MODEL,
+    const ai = getAiClient();
+    const response = await ai.getGenerativeModel({ model: DEFAULT_MODEL }).generateContent({
       contents: [
         { role: 'user', parts: [{ text: prompt }] }
       ]
     });
-    const text = response.text || "";
+    const text = response.response.text() || "";
     return parseGeminiResponse<MCQ[]>(text);
   } catch (error) {
     console.error("Gemini API Error:", error);
@@ -66,13 +78,13 @@ export async function generateFlashcardsFromNotes(notes: string, numCards: numbe
   Example: [{"front": "Question", "back": "Answer"}]`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: DEFAULT_MODEL,
+    const ai = getAiClient();
+    const response = await ai.getGenerativeModel({ model: DEFAULT_MODEL }).generateContent({
       contents: [
         { role: 'user', parts: [{ text: prompt }] }
       ]
     });
-    const text = response.text || "";
+    const text = response.response.text() || "";
     return parseGeminiResponse<Flashcard[]>(text);
   } catch (error) {
     console.error("Flashcard Generation Error:", error);
@@ -91,13 +103,13 @@ export async function generateFlashcardsFromTopic(topic: string, difficulty: str
   Ensure the content is scientifically accurate and professional.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: DEFAULT_MODEL,
+    const ai = getAiClient();
+    const response = await ai.getGenerativeModel({ model: DEFAULT_MODEL }).generateContent({
       contents: [
         { role: 'user', parts: [{ text: prompt }] }
       ]
     });
-    const text = response.text || "";
+    const text = response.response.text() || "";
     return parseGeminiResponse<Flashcard[]>(text);
   } catch (error) {
     console.error("Flashcard Topic Generation Error:", error);
@@ -114,13 +126,13 @@ export async function summarizeNotes(notes: string): Promise<string> {
   
   Return the bullet points as a plain text list.`;
 
-  const response = await ai.models.generateContent({
-    model: DEFAULT_MODEL,
+  const ai = getAiClient();
+  const response = await ai.getGenerativeModel({ model: DEFAULT_MODEL }).generateContent({
     contents: [
       { role: 'user', parts: [{ text: prompt }] }
     ]
   });
-  return response.text || "Failed to generate summary.";
+  return response.response.text() || "Failed to generate summary.";
 }
 
 export interface ChatMessage {
@@ -154,17 +166,17 @@ export async function getChatResponse(message: string, history: ChatMessage[] = 
         - If they seem confused, suggest they check the "Study Materials" or "Signature Quizzes" in their dashboard.`;
 
   try {
-    const response = await ai.models.generateContent({
+    const ai = getAiClient();
+    const response = await ai.getGenerativeModel({ 
       model: DEFAULT_MODEL,
-      contents: [
+      systemInstruction 
+    }).generateContent({
+      contents: history.length > 0 ? [
         ...history,
         { role: 'user', parts: [{ text: message }] }
-      ],
-      config: {
-        systemInstruction
-      }
+      ] : [{ role: 'user', parts: [{ text: message }] }]
     });
-    return response.text || "I'm sorry, I couldn't generate a response.";
+    return response.response.text() || "I'm sorry, I couldn't generate a response.";
   } catch (error) {
     console.error("Chat Error:", error);
     throw error;

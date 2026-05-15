@@ -35,7 +35,7 @@ const drNikhilImg = getDriveImageUrl("19bUrS03sE3-YwzhNxeTHa5RhxDN1e81M");
 const anandImg = getDriveImageUrl("1zB7oj0EJTNV5OaTQOP4L24dMh4NA0tl7");
 const sameerImg = getDriveImageUrl("1Uq_xa8KT7gz040ztjocnuVzqj3o0Wvma");
 const drAkshayImg = getDriveImageUrl("1v3Zx8s-fOIrgNssFMJRlSgVXJBGtLqPQ");
-const logoImg = getDriveImageUrl("12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl");
+const logoImg = getDriveImageUrl("1uDq_nsv88sHmTz1nNVyb5uBQS6h83izK");
 
 const TEAM_MEMBERS = [
   {

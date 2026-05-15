@@ -4,12 +4,14 @@ import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase SDK
+console.log("Firebase: Initializing with config...", firebaseConfig?.projectId);
 if (!firebaseConfig || !firebaseConfig.apiKey) {
   console.error("Firebase configuration is missing or invalid!");
 }
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+console.log("Firebase: SDK Initialized.");
 export const googleProvider = new GoogleAuthProvider();
 
 // Validate Connection to Firestore

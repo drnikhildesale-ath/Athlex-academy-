@@ -6,7 +6,7 @@ import { LogOut, User, Menu, X, Dumbbell, Instagram, Phone, Linkedin, Youtube } 
 import { Chatbot } from './Chatbot';
 import { BrandLogo } from './BrandLogo';
 
-const logoImg = "https://lh3.googleusercontent.com/d/12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl";
+const logoImg = "https://lh3.googleusercontent.com/d/1uDq_nsv88sHmTz1nNVyb5uBQS6h83izK";
 
 interface LayoutProps {
   children: React.ReactNode;
