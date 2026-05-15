@@ -14,7 +14,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import QuizPage from './pages/QuizPage';
 import FlashcardsPage from './pages/FlashcardsPage';
 
-const logoImg = "https://lh3.googleusercontent.com/d/12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl";
+const logoImg = "https://lh3.googleusercontent.com/d/1uDq_nsv88sHmTz1nNVyb5uBQS6h83izK";
 
 export default function App() {
   console.log("App component rendering...");
