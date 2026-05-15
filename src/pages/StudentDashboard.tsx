@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { collection, query, orderBy, getDocs, where, limit, limitToLast } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, getDocsCached, formatFirebaseDate } from '../lib/firebase';
+import { BrandLogo } from '../components/BrandLogo';
 import { Video, BookOpen, Trophy, Clock, ChevronRight, Star, Dumbbell, PlayCircle, FileText, GraduationCap, Globe, ExternalLink, Phone, Award, X, Megaphone, CheckCircle2, Activity, Lightbulb, MessageSquare, BookCheck, Sparkles, LogOut, ArrowRight, User, Lock, RefreshCw } from 'lucide-react';
 
 interface StudentDashboardProps {
@@ -215,7 +216,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-12 h-12 border-4 border-brand-navy border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-500 font-bold animate-pulse uppercase tracking-widest text-xs">Loading Dashboard</p>
         </div>
       </div>
@@ -226,9 +227,9 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
   if (courses.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-[3rem] p-12 text-center border border-slate-100 shadow-2xl shadow-blue-500/10">
-          <div className="bg-blue-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 animate-bounce-slow">
-            <Lock className="h-10 w-10 text-blue-600" />
+        <div className="max-w-md w-full bg-white rounded-[3rem] p-12 text-center border border-slate-100 shadow-2xl shadow-brand-navy/10">
+          <div className="bg-brand-navy/5 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 animate-bounce-slow">
+            <Lock className="h-10 w-10 text-brand-navy" />
           </div>
           <h1 className="text-3xl font-black font-serif italic text-slate-900 mb-4 italic">Academy Access Pending</h1>
           <p className="text-slate-500 font-medium leading-relaxed mb-10 italic">
@@ -239,7 +240,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               href="https://chat.whatsapp.com/CDwia073NgaK3WsQOxME7b" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="block w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"
+              className="block w-full py-5 bg-brand-navy text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-brand-navy/20"
             >
               Contact Support
             </a>
@@ -286,13 +287,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       {/* Sidebar Navigation */}
       <aside className="w-full lg:w-72 bg-white lg:sticky lg:top-0 h-auto lg:h-screen border-r border-slate-100 flex flex-col p-6 shadow-sm overflow-y-auto">
         <Link to="/" className="flex items-center space-x-3 mb-10 p-2 hover:bg-slate-50 rounded-2xl transition-all">
-          <div className="bg-blue-600 p-2 rounded-xl">
-            <Trophy className="h-4 w-4 text-white" />
-          </div>
-          <div>
-            <h1 className="text-sm font-black font-serif italic text-slate-900 leading-tight">Athlex Academy</h1>
-            <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">Back to Website</p>
-          </div>
+          <BrandLogo className="h-10 w-auto" />
         </Link>
 
         <nav className="space-y-1 mb-12 text-sm font-bold">
@@ -301,7 +296,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             onClick={() => {
               setActiveVideo(null);
             }} 
-            className={`w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl transition-all ${!activeVideo ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+            className={`w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl transition-all ${!activeVideo ? 'bg-brand-navy/5 text-brand-navy' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
           >
             <GraduationCap className="h-5 w-5" />
             <span>My Academy</span>
@@ -335,7 +330,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
            <select 
              value={activeCourseId || ''}
              onChange={(e) => setActiveCourseId(e.target.value)}
-             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
            >
              {courses.map(course => (
                <option key={course.id} value={course.id}>{course.title}</option>
@@ -354,14 +349,14 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           <div className="mb-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
               <div>
-                <div className="inline-flex items-center space-x-2 bg-blue-50 px-3 py-1 rounded-full text-blue-600 font-bold text-[10px] uppercase tracking-widest mb-4">
+                <div className="inline-flex items-center space-x-2 bg-brand-navy/5 px-3 py-1 rounded-full text-brand-navy font-bold text-[10px] uppercase tracking-widest mb-4">
                   <Sparkles className="h-3 w-3" />
                   <span>Enrolled Academy Student</span>
                 </div>
                 <h1 className="text-4xl lg:text-5xl font-black font-serif text-slate-900 tracking-tight italic mb-3 flex items-center gap-4">
-                  Hello, <span className="text-blue-600 underline decoration-blue-200">{user.displayName?.split(' ')[0]}!</span>
+                  Hello, <span className="text-brand-navy underline decoration-brand-navy/20">{user.displayName?.split(' ')[0]}!</span>
                   {user.batch && (
-                    <span className="inline-block text-[10px] bg-blue-600 text-white px-4 py-1.5 rounded-full uppercase tracking-widest not-italic">
+                    <span className="inline-block text-[10px] bg-brand-navy text-white px-4 py-1.5 rounded-full uppercase tracking-widest not-italic">
                       {user.batch}
                     </span>
                   )}
@@ -372,7 +367,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               <div className="flex items-center space-x-6">
                 <button 
                   onClick={() => fetchStudentData(true)}
-                  className="p-3 text-slate-400 hover:text-blue-600 transition-all hover:bg-white rounded-2xl group shadow-sm hover:shadow-md border border-transparent hover:border-slate-100"
+                  className="p-3 text-slate-400 hover:text-brand-navy transition-all hover:bg-white rounded-2xl group shadow-sm hover:shadow-md border border-transparent hover:border-slate-100"
                   title="Refresh Content"
                 >
                   <RefreshCw className="h-6 w-6 group-active:rotate-180 transition-transform duration-500" />
@@ -383,7 +378,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                     <div className="text-sm font-bold text-slate-900">{roadmapProgress}% Completed</div>
                   </div>
                   <div className="w-14 h-14 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-3 flex items-center justify-center">
-                    <Trophy className="h-8 w-8 text-blue-600" />
+                    <Trophy className="h-8 w-8 text-brand-navy" />
                   </div>
                 </div>
               </div>
@@ -424,7 +419,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
             className="mb-12"
           >
-            <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 rounded-[3rem] p-8 md:p-12 text-white relative shadow-2xl shadow-blue-500/30 overflow-hidden group">
+            <div className="bg-gradient-to-br from-brand-navy via-slate-800 to-slate-900 rounded-[3rem] p-8 md:p-12 text-white relative shadow-2xl shadow-brand-navy/30 overflow-hidden group">
               {/* Decorative elements */}
               <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:scale-110 transition-transform duration-700"></div>
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
@@ -443,9 +438,9 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 
                 <div className="flex-1 text-center lg:text-left">
                   <h2 className="text-3xl md:text-4xl font-black mb-4 tracking-tight leading-tight">
-                    Welcome to your <span className="text-blue-200">Signature Academy.</span>
+                    Welcome to your <span className="text-brand-gold">Signature Academy.</span>
                   </h2>
-                  <p className="text-lg md:text-xl text-blue-100 font-medium mb-10 max-w-2xl">
+                  <p className="text-lg md:text-xl text-slate-100 font-medium mb-10 max-w-2xl">
                     Everything you need to master your ACE-CPT certification is right here. Let's explore your dashboard.
                   </p>
                   
@@ -463,9 +458,9 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                         key={i} 
                         className="bg-white/10 p-5 rounded-2xl border border-white/10 backdrop-blur-sm hover:bg-white/20 transition-colors"
                       >
-                        <div className="text-blue-200 mb-3">{step.icon}</div>
+                        <div className="text-brand-gold mb-3">{step.icon}</div>
                         <div className="text-white font-bold text-sm mb-1">{step.title}</div>
-                        <div className="text-blue-100/70 text-xs">{step.desc}</div>
+                        <div className="text-slate-100/70 text-xs">{step.desc}</div>
                       </motion.div>
                     ))}
                   </div>
@@ -485,7 +480,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               onClick={() => setActiveCourseId(course.id)}
               className={`px-6 py-3 rounded-2xl whitespace-nowrap font-bold text-sm transition-all flex items-center space-x-2 ${
                 activeCourseId === course.id 
-                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/20' 
+                  ? 'bg-brand-navy text-white shadow-xl shadow-brand-navy/20' 
                   : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'
               }`}
             >
@@ -505,8 +500,8 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
       }).length > 0 && (
         <div className="mb-12 space-y-4">
           <div className="flex items-center space-x-3 mb-6">
-            <div className="bg-red-50 p-2 rounded-lg">
-              <Megaphone className="h-5 w-5 text-red-600" />
+            <div className="bg-brand-navy/5 p-2 rounded-lg">
+              <Megaphone className="h-5 w-5 text-brand-navy" />
             </div>
             <h2 className="text-xl font-bold text-slate-900 tracking-tight">Announcements & Tasks</h2>
           </div>
@@ -523,7 +518,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                 animate={{ opacity: 1, x: 0 }}
                 className={`p-6 rounded-3xl border-l-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 ${
                   ann.type === 'urgent' ? 'bg-red-50 border-red-500' : 
-                  ann.type === 'task' ? 'bg-blue-50 border-blue-500' : 'bg-white border-slate-200'
+                  ann.type === 'task' ? 'bg-brand-navy/5 border-brand-navy' : 'bg-white border-slate-200'
                 }`}
               >
                 <div className="flex-1">
@@ -537,8 +532,8 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                       )}
                     </div>
                     <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                      ann.type === 'urgent' ? 'bg-red-600 text-white animate-pulse' :
-                      ann.type === 'task' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+                      ann.type === 'urgent' ? 'bg-brand-gold text-slate-900 animate-pulse' :
+                      ann.type === 'task' ? 'bg-brand-navy text-white' : 'bg-slate-200 text-slate-600'
                     }`}>
                       {ann.type}
                     </span>
@@ -565,10 +560,10 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
             <div className="flex items-center space-x-4">
               <div className="text-right">
                 <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Mastery Progress</div>
-                <div className="text-2xl font-black text-blue-600">{roadmapProgress}%</div>
+                <div className="text-2xl font-black text-brand-navy">{roadmapProgress}%</div>
               </div>
-              <div className="bg-blue-50 p-4 rounded-3xl">
-                <Award className="h-8 w-8 text-blue-600" />
+              <div className="bg-brand-navy/5 p-4 rounded-3xl">
+                <Award className="h-8 w-8 text-brand-navy" />
               </div>
             </div>
           </div>
@@ -579,7 +574,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${roadmapProgress}%` }}
-                className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+                className="absolute top-0 left-0 h-full bg-gradient-to-r from-brand-navy to-slate-800 rounded-full shadow-[0_0_20px_rgba(15,23,42,0.4)]"
               />
             </div>
 
@@ -599,11 +594,11 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
               animate={{ left: `${roadmapProgress}%` }}
               className="absolute top-3 -translate-x-1/2 z-20 flex flex-col items-center group cursor-default"
             >
-              <div className="bg-white p-3 rounded-[1.25rem] shadow-2xl border border-blue-100 flex items-center justify-center -translate-y-4 group-hover:-translate-y-6 transition-transform duration-300">
-                <GraduationCap className="h-6 w-6 text-blue-600" />
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r border-b border-blue-100 rotate-45"></div>
+                     <div className={`bg-white p-3 rounded-[1.25rem] shadow-2xl border border-brand-navy/10 flex items-center justify-center -translate-y-4 group-hover:-translate-y-6 transition-transform duration-300`}>
+                <GraduationCap className="h-6 w-6 text-brand-navy" />
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r border-b border-brand-navy/10 rotate-45"></div>
               </div>
-              <div className="mt-14 bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-lg shadow-blue-500/30">
+              <div className="mt-14 bg-brand-navy text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-lg shadow-brand-navy/30">
                 You are here
               </div>
             </motion.div>
@@ -644,7 +639,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           >
           <div className="flex items-center justify-between">
             <h2 className="text-3xl font-serif font-black text-slate-900 tracking-tight italic">Academy Quizzes</h2>
-            <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
+            <span className="text-sm font-bold text-brand-navy bg-brand-navy/5 px-4 py-1.5 rounded-full uppercase tracking-wider">
               {quizzes.filter(q => q.courseId === activeCourseId).length} Available
             </span>
           </div>
@@ -662,11 +657,11 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                   transition={{ delay: idx * 0.05 }}
                   className={`group premium-card p-8 hover:-translate-y-2 transition-all relative overflow-hidden h-full ${isCompleted ? 'bg-indigo-50/20' : 'bg-white'}`}
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-[3rem] -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-brand-navy/5 rounded-bl-[3rem] -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
                   
                   <div className="relative z-10">
                     <div className="flex justify-between items-start mb-6">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:rotate-6 ${isCompleted ? 'bg-green-100 text-green-600' : isGoogleForm ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:rotate-6 ${isCompleted ? 'bg-green-100 text-green-600' : isGoogleForm ? 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white' : 'bg-brand-navy/5 text-brand-navy group-hover:bg-brand-navy group-hover:text-white'}`}>
                         {isCompleted ? <CheckCircle2 className="h-7 w-7" /> : isGoogleForm ? <Globe className="h-7 w-7" /> : <BookCheck className="h-7 w-7" />}
                       </div>
                       {isCompleted && (
@@ -726,7 +721,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           <div className="pt-8">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-3xl font-serif font-black text-slate-900 tracking-tight italic">Class Sessions</h2>
-              <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
+              <span className="text-sm font-bold text-brand-navy bg-brand-navy/5 px-4 py-1.5 rounded-full uppercase tracking-wider">
                 {recordings.filter(r => r.courseId === activeCourseId).length} Recordings
               </span>
             </div>
@@ -802,7 +797,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           <div className="pt-8">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Flashcards</h2>
-              <span className="text-sm font-bold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full uppercase tracking-wider">
+              <span className="text-sm font-bold text-brand-navy bg-brand-navy/5 px-4 py-1.5 rounded-full uppercase tracking-wider">
                 {flashcardSets.filter(s => s.courseId === activeCourseId).length} Sets
               </span>
             </div>
@@ -857,10 +852,10 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
           <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-sm">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-xl font-bold text-slate-900 flex items-center tracking-tight">
-                <Activity className="h-6 w-6 mr-3 text-blue-600" />
+                <Activity className="h-6 w-6 mr-3 text-brand-navy" />
                 Exercise Library
               </h2>
-              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">
+              <span className="text-xs font-bold text-brand-navy bg-brand-navy/5 px-3 py-1 rounded-full uppercase">
                 {exercises.filter(ex => ex.assignedTo?.includes(user.uid)).length} Videos
               </span>
             </div>
@@ -881,12 +876,12 @@ export default function StudentDashboard({ user }: StudentDashboardProps) {
                       <PlayCircle className="h-10 w-10 text-white shadow-xl" />
                     </div>
                     <div className="absolute top-2 left-2">
-                      <span className="bg-blue-600/90 text-white text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded backdrop-blur">
+                      <span className="bg-brand-navy/90 text-white text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded backdrop-blur">
                         {ex.category}
                       </span>
                     </div>
                   </div>
-                  <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors">{ex.name}</h3>
+                  <h3 className="font-bold text-sm text-slate-900 group-hover:text-brand-navy transition-colors">{ex.name}</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Biomechanics Tutorial</p>
                 </div>
               ))}

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { db, getDocsCached } from '../lib/firebase';
+import { BrandLogo } from '../components/BrandLogo';
 import { 
   ChevronRight, 
   Dumbbell, 
@@ -162,7 +163,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 bg-slate-50 -z-10">
-          <div className="absolute top-0 right-0 w-1/2 h-full bg-blue-600/5 rounded-l-[10rem] transform translate-x-1/4"></div>
+          <div className="absolute top-0 right-0 w-1/2 h-full bg-brand-navy/5 rounded-l-[10rem] transform translate-x-1/4"></div>
         </div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -171,12 +172,12 @@ export default function LandingPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full text-blue-600 font-bold text-xs uppercase tracking-widest mb-6">
+            <div className="inline-flex items-center space-x-2 bg-brand-navy/5 px-4 py-2 rounded-full text-brand-navy font-bold text-xs uppercase tracking-widest mb-6">
               <Award className="h-4 w-4" />
               <span>Welcome to Athlex Academy of Sports Science and Performance</span>
             </div>
             <h1 className="text-6xl lg:text-7xl font-black text-slate-900 leading-[1.1] mb-8">
-              Master the Science of <span className="text-blue-600">Human Performance.</span>
+              Master the Science of <span className="text-brand-gold">Human Performance.</span>
             </h1>
             <p className="text-xl text-slate-500 font-medium mb-10 leading-relaxed max-w-lg">
               Empowering fitness professionals with evidence-based education, clinical reasoning, and industry-leading certifications.
@@ -184,7 +185,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
               <Link 
                 to="/auth"
-                className="px-10 py-5 bg-blue-600 text-white rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center group"
+                className="px-10 py-5 bg-brand-navy text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all shadow-xl shadow-brand-navy/20 flex items-center justify-center group"
               >
                 Start Learning Now
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -221,7 +222,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="p-10 rounded-[2.5rem] bg-slate-50 border border-slate-100">
-              <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20">
+              <div className="w-14 h-14 bg-brand-navy text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-brand-navy/20">
                 <GraduationCap className="h-7 w-7" />
               </div>
               <h4 className="text-xl font-black text-slate-900 mb-4">Aspiring Trainers</h4>
@@ -239,7 +240,7 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="p-10 rounded-[2.5rem] bg-slate-50 border border-slate-100">
-              <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20">
+              <div className="w-14 h-14 bg-brand-navy text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-brand-navy/20">
                 <ShieldCheck className="h-7 w-7" />
               </div>
               <h4 className="text-xl font-black text-slate-900 mb-4">Sports Scientists</h4>
@@ -256,8 +257,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row gap-16 items-center">
             <div className="lg:w-1/2">
-              <h2 className="text-xs font-black text-blue-600 uppercase tracking-[0.3em] mb-4">The Athlex Edge</h2>
-              <h3 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-8">Why Choose <span className="text-blue-600">Athlex Academy?</span></h3>
+              <h2 className="text-xs font-black text-brand-navy uppercase tracking-[0.3em] mb-4">The Athlex Edge</h2>
+              <h3 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-8">Why Choose <span className="text-brand-navy">Athlex Academy?</span></h3>
               <div className="space-y-6">
                 {[
                   { title: "Clinical Reasoning", desc: "We don't just teach exercises; we teach you the 'why' behind every movement." },
@@ -266,7 +267,7 @@ export default function LandingPage() {
                   { title: "Practical Application", desc: "Hands-on training that prepares you for real-world client scenarios." }
                 ].map((item, i) => (
                   <div key={i} className="flex items-start space-x-4">
-                    <div className="mt-1 bg-blue-600 rounded-full p-1">
+                    <div className="mt-1 bg-brand-navy rounded-full p-1">
                       <CheckCircle2 className="h-4 w-4 text-white" />
                     </div>
                     <div>
@@ -299,7 +300,7 @@ export default function LandingPage() {
       <section className="py-32 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
-            <h2 className="text-xs font-black text-blue-600 uppercase tracking-[0.3em] mb-4">Expert Mentors</h2>
+            <h2 className="text-xs font-black text-brand-navy uppercase tracking-[0.3em] mb-4">Expert Mentors</h2>
             <h3 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight">Meet Our Team</h3>
             <p className="mt-6 text-slate-500 font-medium max-w-2xl mx-auto">
               Our team members bring a decade plus of experience in their respective specialities and expertise.
@@ -322,7 +323,7 @@ export default function LandingPage() {
                   </div>
                   <div>
                     <h4 className="text-2xl font-black text-slate-900 mb-1">{member.name}</h4>
-                    <div className="text-blue-600 font-bold text-sm uppercase tracking-widest mb-6">{member.role}</div>
+                    <div className="text-brand-navy font-bold text-sm uppercase tracking-widest mb-6">{member.role}</div>
                     <p className="text-slate-600 leading-relaxed font-medium">
                       {member.bio}
                     </p>
@@ -336,10 +337,10 @@ export default function LandingPage() {
 
       {/* Success Stories Section */}
       <section className="py-32 bg-slate-900 text-white overflow-hidden relative">
-        <div className="absolute inset-0 bg-blue-600/5 -z-10"></div>
+        <div className="absolute inset-0 bg-brand-navy/5 -z-10"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
-            <h2 className="text-xs font-black text-blue-400 uppercase tracking-[0.3em] mb-4">Real Results</h2>
+            <h2 className="text-xs font-black text-brand-gold uppercase tracking-[0.3em] mb-4">Real Results</h2>
             <h3 className="text-4xl md:text-5xl font-black tracking-tight">Success Stories</h3>
             <p className="mt-6 text-slate-400 font-medium max-w-2xl mx-auto">
               Hear from our students who have transformed their careers and lives through Athlex Academy.
@@ -361,16 +362,16 @@ export default function LandingPage() {
                   <img src={story.thumbnail} alt={story.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-60" referrerPolicy="no-referrer" />
                   {story.videoUrl && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center shadow-xl shadow-blue-600/40 group-hover:scale-110 transition-transform">
+                      <div className="w-16 h-16 bg-brand-navy rounded-full flex items-center justify-center shadow-xl shadow-brand-navy/40 group-hover:scale-110 transition-transform">
                         <PlayCircle className="h-8 w-8 text-white" />
                       </div>
                     </div>
                   )}
                 </div>
                 <div className="p-8">
-                  <h4 className="text-xl font-bold mb-2 group-hover:text-blue-400 transition-colors">{story.title}</h4>
+                  <h4 className="text-xl font-bold mb-2 group-hover:text-brand-gold transition-colors">{story.title}</h4>
                   <div className="flex items-center text-slate-400 text-sm font-bold uppercase tracking-widest">
-                    <Users className="h-4 w-4 mr-2 text-blue-500" />
+                    <Users className="h-4 w-4 mr-2 text-brand-gold" />
                     {story.student}
                   </div>
                 </div>
@@ -381,7 +382,7 @@ export default function LandingPage() {
           <div className="mt-16 text-center">
             <a 
               href="#courses" 
-              className="inline-flex items-center px-10 py-5 bg-blue-600 text-white rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 group"
+              className="inline-flex items-center px-10 py-5 bg-brand-navy text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all shadow-xl shadow-brand-navy/20 group"
             >
               You can be the one on our Hall of Fame
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -393,14 +394,14 @@ export default function LandingPage() {
       {/* Courses & Inquiry Section */}
       <section id="courses" className="py-32 bg-slate-900 text-white overflow-hidden relative">
         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600 rounded-full blur-[10rem]"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600 rounded-full blur-[10rem]"></div>
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-navy rounded-full blur-[10rem]"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-brand-gold rounded-full blur-[10rem]"></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
             <div>
-              <h2 className="text-xs font-black text-blue-400 uppercase tracking-[0.3em] mb-4">Course Catalog</h2>
+              <h2 className="text-xs font-black text-brand-gold uppercase tracking-[0.3em] mb-4">Course Catalog</h2>
               <h3 className="text-4xl md:text-5xl font-black mb-8 leading-tight">Explore Our Specialized Training Programs</h3>
               <p className="text-slate-400 text-lg mb-12 leading-relaxed">
                 Athlex Academy offers a wide range of courses designed to elevate your career in the fitness industry. From foundational certifications to advanced sports nutrition.
@@ -409,11 +410,11 @@ export default function LandingPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {COURSES.slice(0, 8).map((course, i) => (
                   <div key={i} className="flex items-center space-x-3 text-slate-300 font-medium">
-                    <CheckCircle2 className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-brand-gold flex-shrink-0" />
                     <span>{course}</span>
                   </div>
                 ))}
-                <div className="flex items-center space-x-3 text-blue-400 font-bold italic">
+                <div className="flex items-center space-x-3 text-brand-gold font-bold italic">
                   <span>And many more...</span>
                 </div>
               </div>
@@ -446,7 +447,7 @@ export default function LandingPage() {
                     <select 
                       value={selectedCourse}
                       onChange={(e) => setSelectedCourse(e.target.value)}
-                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-bold text-slate-700"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 focus:bg-white transition-all font-bold text-slate-700"
                     >
                       {COURSES.map((course, i) => (
                         <option key={i} value={course}>{course}</option>
@@ -463,7 +464,7 @@ export default function LandingPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="your@email.com"
-                        className="w-full pl-14 pr-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                        className="w-full pl-14 pr-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 focus:bg-white transition-all font-medium"
                         required
                       />
                     </div>
@@ -478,7 +479,7 @@ export default function LandingPage() {
                         value={mobile}
                         onChange={(e) => setMobile(e.target.value)}
                         placeholder="Your Mobile Number"
-                        className="w-full pl-14 pr-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                        className="w-full pl-14 pr-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 focus:bg-white transition-all font-medium"
                         required
                       />
                     </div>
@@ -487,7 +488,7 @@ export default function LandingPage() {
                   <button 
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center disabled:opacity-50"
+                    className="w-full bg-brand-navy text-white py-5 rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all shadow-xl shadow-brand-navy/20 flex items-center justify-center disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <Loader2 className="h-6 w-6 animate-spin" />
@@ -510,16 +511,16 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20">
             <div>
-              <h2 className="text-xs font-black text-blue-600 uppercase tracking-[0.3em] mb-4">Get In Touch</h2>
-              <h3 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-8">Have Questions? <span className="text-blue-600">Contact Us.</span></h3>
+              <h2 className="text-xs font-black text-brand-navy uppercase tracking-[0.3em] mb-4">Get In Touch</h2>
+              <h3 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-8">Have Questions? <span className="text-brand-navy">Contact Us.</span></h3>
               <p className="text-slate-500 text-lg mb-12 leading-relaxed">
                 Whether you're an aspiring trainer or an experienced coach, we're here to help you choose the right path for your career.
               </p>
 
               <div className="space-y-8">
                 <div className="flex items-center space-x-6">
-                  <div className="bg-blue-50 p-4 rounded-2xl">
-                    <Mail className="h-6 w-6 text-blue-600" />
+                   <div className="bg-brand-navy/5 p-4 rounded-2xl">
+                    <Mail className="h-6 w-6 text-brand-navy" />
                   </div>
                   <div>
                     <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Email Us</div>
@@ -527,8 +528,8 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-6">
-                  <div className="bg-blue-50 p-4 rounded-2xl">
-                    <Phone className="h-6 w-6 text-blue-600" />
+                  <div className="bg-brand-navy/5 p-4 rounded-2xl">
+                    <Phone className="h-6 w-6 text-brand-navy" />
                   </div>
                   <div>
                     <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Call Us</div>
@@ -536,8 +537,8 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-6">
-                  <div className="bg-blue-50 p-4 rounded-2xl">
-                    <MapPin className="h-6 w-6 text-blue-600" />
+                  <div className="bg-brand-navy/5 p-4 rounded-2xl">
+                    <MapPin className="h-6 w-6 text-brand-navy" />
                   </div>
                   <div>
                     <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Visit Us</div>
@@ -584,12 +585,7 @@ export default function LandingPage() {
       <footer className="bg-white py-20 border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex justify-center mb-8">
-            <img 
-              src={logoImg} 
-              alt="Athlex Academy Logo" 
-              className="h-16 w-auto"
-              referrerPolicy="no-referrer"
-            />
+            <BrandLogo className="h-20 w-auto" />
           </div>
           <p className="text-slate-500 font-medium mb-8">
             © {new Date().getFullYear()} Athlex Academy of Sports Science and Performance. All rights reserved.

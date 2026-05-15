@@ -1,7 +1,8 @@
 import React from 'react';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
-import { Chrome, Dumbbell, AlertCircle } from 'lucide-react';
+import { Chrome, AlertCircle } from 'lucide-react';
+import { BrandLogo } from '../components/BrandLogo';
 
 export default function AuthPage() {
   const [loading, setLoading] = React.useState(false);
@@ -37,13 +38,13 @@ export default function AuthPage() {
     <div className="min-h-[80vh] flex items-center justify-center bg-slate-50 px-4">
       <div className="max-w-md w-full bg-white p-10 rounded-[3rem] shadow-2xl shadow-slate-200 border border-slate-100 text-center relative overflow-hidden">
         {/* Decorative elements */}
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-red-600"></div>
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-50 rounded-full blur-3xl opacity-50"></div>
-        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-red-50 rounded-full blur-3xl opacity-50"></div>
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-navy to-brand-gold"></div>
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-navy/5 rounded-full blur-3xl opacity-50"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-brand-gold/5 rounded-full blur-3xl opacity-50"></div>
 
         <div className="relative z-10">
-          <div className="bg-red-50 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
-            <Dumbbell className="h-10 w-10 text-red-600" />
+          <div className="flex items-center justify-center mb-8">
+            <BrandLogo className="h-20 w-auto" />
           </div>
           
           <h1 className="text-3xl font-black text-slate-900 mb-3 tracking-tight">Welcome Back</h1>
@@ -64,10 +65,10 @@ export default function AuthPage() {
             className="w-full flex items-center justify-center space-x-4 bg-white border-2 border-slate-200 text-slate-700 px-8 py-4 rounded-2xl font-bold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group"
           >
             {loading ? (
-              <div className="w-6 h-6 border-3 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+              <div className="w-6 h-6 border-3 border-slate-300 border-t-brand-navy rounded-full animate-spin"></div>
             ) : (
               <>
-                <Chrome className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
+                <Chrome className="h-6 w-6 text-brand-navy group-hover:scale-110 transition-transform" />
                 <span>Continue with Google</span>
               </>
             )}

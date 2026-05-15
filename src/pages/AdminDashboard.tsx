@@ -4,6 +4,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, wh
 import { db, handleFirestoreError, OperationType, getDocsCached, formatFirebaseDate } from '../lib/firebase';
 import { generateQuizFromNotes, summarizeNotes, MCQ, generateFlashcardsFromNotes, Flashcard, generateFlashcardsFromTopic } from '../services/gemini';
 import { extractTextFromPDF } from '../lib/pdf-utils';
+import { BrandLogo } from '../components/BrandLogo';
 import { Plus, Trash2, FileText, Sparkles, Loader2, Calendar, Clock, ChevronRight, Dumbbell, AlertCircle, CheckCircle2, Trophy, Users, Upload, FileUp, Video, Globe, Mail, Phone, PlayCircle, BookCheck, Activity, Lightbulb, Megaphone, MessageSquare, Send, X, Award, Search, LayoutDashboard, Layout, RefreshCw } from 'lucide-react';
 
 declare global {
@@ -925,15 +926,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         {/* Background Accent */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         
-        <div className="flex items-center space-x-3 mb-12 relative z-10">
-          <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10">
-            <Trophy className="h-6 w-6 text-blue-400" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black font-serif text-white leading-tight italic">Athlex Admin</h1>
-            <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest">Premium Portal</p>
-          </div>
-        </div>
+        <Link to="/" className="flex items-center space-x-3 mb-12 relative z-10 p-2 hover:bg-white/5 rounded-2xl transition-all">
+          <BrandLogo className="h-10 w-auto" />
+        </Link>
 
         <nav className="space-y-6 relative z-10">
           <div>
@@ -941,7 +936,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               onClick={() => setActiveTab('overview')}
               className={`w-full flex items-center space-x-4 px-6 py-4 rounded-2xl font-bold text-sm transition-all group ${
                 activeTab === 'overview' 
-                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/20 translate-x-2' 
+                  ? 'bg-brand-navy text-white shadow-xl shadow-brand-navy/20 translate-x-2' 
                   : 'text-slate-400 hover:bg-white/5 active:scale-95'
               }`}
             >
@@ -1010,7 +1005,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         : 'text-slate-500 hover:bg-white/5 active:scale-95'
                     }`}
                   >
-                    <span className={`transition-transform duration-300 ${activeTab === tab.id ? 'scale-110 text-blue-400' : 'group-hover:scale-110 text-slate-600'}`}>
+                    <span className={`transition-transform duration-300 ${activeTab === tab.id ? 'scale-110 text-brand-gold' : 'group-hover:scale-110 text-slate-600'}`}>
                       {tab.icon}
                     </span>
                     <span className="font-serif italic">{tab.label}</span>
@@ -1046,7 +1041,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         <header className="mb-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-100 pb-8">
             <div>
-              <div className="flex items-center space-x-2 text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">
+              <div className="flex items-center space-x-2 text-[10px] font-black text-brand-navy uppercase tracking-widest mb-1">
                 <LayoutDashboard className="h-3 w-3" />
                 <span>Operational Control</span>
               </div>
@@ -2230,8 +2225,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             {activeTab === 'announcements' && (
               <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-24">
                 <div className="flex items-center space-x-3 mb-8">
-                  <div className="bg-red-50 p-3 rounded-2xl">
-                    <Megaphone className="h-6 w-6 text-red-600" />
+                  <div className="bg-brand-navy/5 p-3 rounded-2xl">
+                    <Megaphone className="h-6 w-6 text-brand-navy" />
                   </div>
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">New Announcement</h2>
                 </div>
@@ -2244,7 +2239,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                       value={announcementTitle}
                       onChange={(e) => setAnnouncementTitle(e.target.value)}
                       placeholder="e.g. Final Exam Date Announced"
-                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:bg-white transition-all font-medium"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 focus:bg-white transition-all font-medium"
                       required
                     />
                   </div>
@@ -2256,7 +2251,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                           key={type}
                           type="button"
                           onClick={() => setAnnouncementType(type as any)}
-                          className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${announcementType === type ? 'bg-red-600 text-white shadow-lg shadow-red-500/20' : 'bg-slate-50 text-slate-500'}`}
+                          className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${announcementType === type ? 'bg-brand-navy text-white shadow-lg shadow-brand-navy/20' : 'bg-slate-50 text-slate-500'}`}
                         >
                           {type}
                         </button>
@@ -2313,7 +2308,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
                   <button
                     type="submit"
-                    className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-all shadow-xl shadow-red-500/20"
+                    className="w-full bg-brand-navy text-white py-4 rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all shadow-xl shadow-brand-navy/20"
                   >
                     Publish to Targeting
                   </button>
@@ -2535,7 +2530,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     <select
                       value={activeCourseId}
                       onChange={(e) => setActiveCourseId(e.target.value)}
-                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all font-medium"
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 focus:bg-white transition-all font-medium"
                     >
                       <option value="">Select a Course...</option>
                       {courses.map(c => (
@@ -2574,14 +2569,14 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                       <button
                         type="button"
                         onClick={() => setCreationMode('ai')}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all ${creationMode === 'ai' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 text-slate-500'}`}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${creationMode === 'ai' ? 'bg-brand-navy text-white shadow-lg shadow-brand-navy/20' : 'bg-slate-50 text-slate-500'}`}
                       >
                         <Sparkles className="h-3 w-3 inline mr-1" /> AI Generated
                       </button>
                       <button
                         type="button"
                         onClick={() => setCreationMode('manual')}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all ${creationMode === 'manual' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 text-slate-500'}`}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${creationMode === 'manual' ? 'bg-brand-navy text-white shadow-lg shadow-brand-navy/20' : 'bg-slate-50 text-slate-500'}`}
                       >
                         <Plus className="h-3 w-3 inline mr-1" /> Manual Entry
                       </button>

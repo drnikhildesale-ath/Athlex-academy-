@@ -111,7 +111,7 @@ export default function QuizPage({ user }: QuizPageProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-12 h-12 border-4 border-brand-navy border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-500 font-bold animate-pulse uppercase tracking-widest text-xs">Preparing Quiz</p>
         </div>
       </div>
@@ -126,11 +126,11 @@ export default function QuizPage({ user }: QuizPageProps) {
 
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <div className="bg-white p-12 rounded-[4rem] shadow-2xl shadow-blue-500/5 border border-slate-100 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-blue-600 to-red-600"></div>
+        <div className="bg-white p-12 rounded-[4rem] shadow-2xl shadow-brand-navy/5 border border-slate-100 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-brand-navy to-brand-gold"></div>
           
-          <div className="bg-blue-50 w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
-            <Trophy className="h-12 w-12 text-blue-600" />
+          <div className="bg-brand-navy/5 w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+            <Trophy className="h-12 w-12 text-brand-navy" />
           </div>
           
           <h1 className="text-4xl font-black text-slate-900 mb-2 tracking-tight">Quiz Completed!</h1>
@@ -142,7 +142,7 @@ export default function QuizPage({ user }: QuizPageProps) {
               <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Correct Answers</div>
             </div>
             <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
-              <div className="text-4xl font-black text-blue-600 mb-1">{score}/{totalPossible}</div>
+              <div className="text-4xl font-black text-brand-navy mb-1">{score}/{totalPossible}</div>
               <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">Total Points ({percentage}%)</div>
             </div>
           </div>
@@ -150,7 +150,7 @@ export default function QuizPage({ user }: QuizPageProps) {
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex-grow bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20"
+              className="flex-grow bg-brand-navy text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all shadow-xl shadow-brand-navy/20"
             >
               Back to Dashboard
             </button>
@@ -186,7 +186,7 @@ export default function QuizPage({ user }: QuizPageProps) {
           </div>
           <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-blue-600 transition-all duration-500" 
+              className="h-full bg-brand-navy transition-all duration-500" 
               style={{ width: `${((currentQuestion + 1) / quiz.questions.length) * 100}%` }}
             ></div>
           </div>
@@ -203,11 +203,11 @@ export default function QuizPage({ user }: QuizPageProps) {
           transition={{ duration: 0.3 }}
           className="bg-white p-10 md:p-16 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-48 h-48 bg-blue-50 rounded-bl-[5rem] -z-0 opacity-50"></div>
+          <div className="absolute top-0 right-0 w-48 h-48 bg-brand-navy/5 rounded-bl-[5rem] -z-0 opacity-50"></div>
           
           <div className="relative z-10">
-            <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center mb-10 shadow-inner">
-              <Dumbbell className="h-8 w-8 text-blue-600" />
+            <div className="bg-brand-navy/5 w-16 h-16 rounded-2xl flex items-center justify-center mb-10 shadow-inner">
+              <Dumbbell className="h-8 w-8 text-brand-navy" />
             </div>
             
             <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-12 leading-tight tracking-tight">
@@ -230,7 +230,7 @@ export default function QuizPage({ user }: QuizPageProps) {
                     buttonClass += "bg-slate-50 border-slate-100 text-slate-400 opacity-50";
                   }
                 } else {
-                  buttonClass += "bg-slate-50 border-slate-100 text-slate-700 hover:border-blue-200 hover:bg-blue-50/50 hover:text-blue-600";
+                  buttonClass += "bg-slate-50 border-slate-100 text-slate-700 hover:border-brand-navy/20 hover:bg-brand-navy/5 hover:text-brand-navy";
                 }
 
                 return (
@@ -288,7 +288,7 @@ export default function QuizPage({ user }: QuizPageProps) {
               <button
                 onClick={handleNext}
                 disabled={!showExplanation || submitting}
-                className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center group"
+                className="bg-brand-navy text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-brand-navy/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center group"
               >
                 {submitting ? (
                   <Loader2 className="h-5 w-5 animate-spin" />

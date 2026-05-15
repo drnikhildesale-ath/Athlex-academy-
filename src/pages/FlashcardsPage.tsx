@@ -41,7 +41,7 @@ export default function FlashcardsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
         <div className="flex flex-col items-center space-y-6">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-16 h-16 border-4 border-brand-navy border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-500 font-black uppercase tracking-[0.2em] text-[10px]">Loading Strategy Deck</p>
         </div>
       </div>
@@ -54,7 +54,7 @@ export default function FlashcardsPage() {
         <div className="text-center">
           <AlertCircle className="h-16 w-16 text-slate-300 mx-auto mb-6" />
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Deck Not Found</h2>
-          <button onClick={() => navigate('/dashboard')} className="text-blue-600 font-bold hover:underline">Return to Dashboard</button>
+          <button onClick={() => navigate('/dashboard')} className="text-brand-navy font-bold hover:underline">Return to Dashboard</button>
         </div>
       </div>
     );
@@ -104,7 +104,7 @@ export default function FlashcardsPage() {
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
-            <div className="inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full text-blue-600 font-bold text-[10px] uppercase tracking-widest mb-4">
+            <div className="inline-flex items-center space-x-2 bg-brand-navy/5 px-4 py-2 rounded-full text-brand-navy font-bold text-[10px] uppercase tracking-widest mb-4">
               <BookOpen className="h-3 w-3" />
               <span>Chapter {setData.chapter} Flashcards</span>
             </div>
@@ -116,7 +116,7 @@ export default function FlashcardsPage() {
             </div>
             <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden ml-auto">
               <motion.div 
-                className="h-full bg-blue-600"
+                className="h-full bg-brand-navy"
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
               />
@@ -152,10 +152,10 @@ export default function FlashcardsPage() {
               >
                 {/* Front */}
                 <div className="absolute inset-0 backface-hidden bg-white rounded-[3rem] shadow-2xl shadow-slate-200/50 flex flex-col items-center justify-center p-12 text-center border border-slate-100 group">
-                  <div className="absolute top-10 left-10 text-[10px] font-black text-blue-600 uppercase tracking-widest">Question</div>
+                  <div className="absolute top-10 left-10 text-[10px] font-black text-brand-navy uppercase tracking-widest">Question</div>
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.front); }}
-                    className="absolute top-8 right-8 p-3 hover:bg-slate-50 rounded-2xl transition-all text-slate-300 hover:text-blue-600 group-hover:scale-110"
+                    className="absolute top-8 right-8 p-3 hover:bg-slate-50 rounded-2xl transition-all text-slate-300 hover:text-brand-navy group-hover:scale-110"
                   >
                     <Volume2 className="h-5 w-5" />
                   </button>
@@ -167,7 +167,7 @@ export default function FlashcardsPage() {
 
                 {/* Back */}
                 <div 
-                  className="absolute inset-0 backface-hidden rotate-y-180 bg-blue-600 rounded-[3rem] shadow-2xl shadow-blue-500/20 flex flex-col items-center justify-center p-12 text-center text-white"
+                  className="absolute inset-0 backface-hidden rotate-y-180 bg-brand-navy rounded-[3rem] shadow-2xl shadow-brand-navy/20 flex flex-col items-center justify-center p-12 text-center text-white"
                   style={{ transform: 'rotateY(180deg)' }}
                 >
                   <div className="absolute top-10 left-10 text-[10px] font-black text-white/50 uppercase tracking-widest">Answer</div>
@@ -206,7 +206,7 @@ export default function FlashcardsPage() {
           <button
             onClick={nextCard}
             disabled={currentIndex === setData.cards.length - 1}
-            className="p-6 rounded-full bg-blue-600 shadow-xl shadow-blue-500/30 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-blue-700 transition-all hover:translate-x-1"
+            className="p-6 rounded-full bg-brand-navy shadow-xl shadow-brand-navy/30 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 transition-all hover:translate-x-1"
           >
             <ChevronRight className="h-8 w-8" />
           </button>

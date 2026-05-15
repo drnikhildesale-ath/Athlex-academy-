@@ -1,10 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
-const getApiKey = () => {
-  return (import.meta as any).env.VITE_GEMINI_API_KEY || "";
-};
-
-const DEFAULT_MODEL = "gemini-3-flash-preview";
+const DEFAULT_MODEL = "gemini-2.0-flash";
+const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY });
 
 function parseGeminiResponse<T>(text: string): T {
   if (!text) return [] as unknown as T;
@@ -26,8 +23,6 @@ export interface MCQ {
 }
 
 export async function generateQuizFromNotes(notes: string, numQuestions: number = 10, difficulty: string = "Medium"): Promise<MCQ[]> {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
   const prompt = `Generate a set of exactly ${numQuestions} multiple-choice questions (MCQs) at a ${difficulty} difficulty level based on the following study notes for the ACE-CPT certification. 
   Each question should have 4 options, a correct answer index (0-3), and a brief explanation.
   
@@ -59,8 +54,6 @@ export interface Flashcard {
 }
 
 export async function generateFlashcardsFromNotes(notes: string, numCards: number = 10): Promise<Flashcard[]> {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
   const prompt = `Generate a set of exactly ${numCards} educational flashcards based on the following study notes for the ACE-CPT certification. 
   Each flashcard should have a 'front' (the question or term) and a 'back' (the answer or definition).
   Make them highly effective for quick revision of complex sports science and fitness concepts.
@@ -88,8 +81,6 @@ export async function generateFlashcardsFromNotes(notes: string, numCards: numbe
 }
 
 export async function generateFlashcardsFromTopic(topic: string, difficulty: string = "Intermediate", numCards: number = 10): Promise<Flashcard[]> {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
   const prompt = `Generate a set of exactly ${numCards} educational flashcards on the topic "${topic}" at a ${difficulty} level for fitness and sports science students (specifically aligned with ACE-CPT standards). 
   Each flashcard should have a 'front' (the question or term) and a 'back' (the answer or definition).
   
@@ -115,8 +106,6 @@ export async function generateFlashcardsFromTopic(topic: string, difficulty: str
 }
 
 export async function summarizeNotes(notes: string): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
   const prompt = `Summarize the following study notes into 15-20 concise bullet points. 
   Focus on key concepts, definitions, and important facts for the ACE-CPT certification.
   
@@ -140,8 +129,6 @@ export interface ChatMessage {
 }
 
 export async function getChatResponse(message: string, history: ChatMessage[] = []): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
-  
   const systemInstruction = `You are the ultimate expert assistant for Athlex Academy, a premier institution for fitness and sports science education. 
         Your goal is to be helpful, professional, encouraging, and deeply knowledgeable about our academy and the fitness industry (specifically ACE-CPT).
 

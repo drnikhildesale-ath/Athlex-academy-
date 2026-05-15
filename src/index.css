@@ -8,6 +8,9 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --animate-bounce-slow: bounce-slow 3s infinite;
 
+  --color-brand-navy: #003358;
+  --color-brand-gold: #B58535;
+
   @keyframes bounce-slow {
     0%, 100% {
       transform: translateY(-5%);

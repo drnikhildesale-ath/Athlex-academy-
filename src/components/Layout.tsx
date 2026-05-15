@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { LogOut, User, Menu, X, Dumbbell, Instagram, Phone, Linkedin, Youtube } from 'lucide-react';
 import { Chatbot } from './Chatbot';
+import { BrandLogo } from './BrandLogo';
 
 const logoImg = "https://lh3.googleusercontent.com/d/12cn4hbiM2s-AlyGxSAT2kjTXVrRcHHOl";
 
@@ -30,23 +31,18 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link to="/" className="flex items-center">
-                <img 
-                  src={logoImg} 
-                  alt="Athlex Academy Logo" 
-                  className="h-12 w-auto"
-                  referrerPolicy="no-referrer"
-                />
+                <BrandLogo className="h-10 w-auto" />
               </Link>
             </div>
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center space-x-8">
-              <Link to="/" className="text-slate-600 hover:text-blue-600 font-medium transition-colors">Home</Link>
+              <Link to="/" className="text-slate-600 hover:text-brand-navy font-medium transition-colors">Home</Link>
               {user && (
                 <>
-                  <Link to="/dashboard" className="text-slate-600 hover:text-blue-600 font-medium transition-colors">Dashboard</Link>
+                  <Link to="/dashboard" className="text-slate-600 hover:text-brand-navy font-medium transition-colors">Dashboard</Link>
                   {isAdmin && (
-                    <Link to="/admin" className="text-slate-600 hover:text-blue-600 font-medium transition-colors">Admin</Link>
+                    <Link to="/admin" className="text-slate-600 hover:text-brand-navy font-medium transition-colors">Admin</Link>
                   )}
                 </>
               )}
@@ -61,7 +57,7 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                      <div className="h-8 w-8 rounded-full bg-brand-navy/10 flex items-center justify-center text-brand-navy">
                         <User className="h-5 w-5" />
                       </div>
                     )}
@@ -78,7 +74,7 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
               ) : (
                 <Link
                   to="/auth"
-                  className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                  className="bg-brand-navy text-white px-6 py-2 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-brand-navy/20"
                 >
                   Login
                 </Link>
@@ -159,12 +155,7 @@ export default function Layout({ children, user, isAdmin }: LayoutProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <img 
-                src={logoImg} 
-                alt="Athlex Academy Logo" 
-                className="h-10 w-auto brightness-0 invert"
-                referrerPolicy="no-referrer"
-              />
+              <BrandLogo className="h-10 w-auto" color="white" />
             </div>
             <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-8">
               <div className="flex items-center space-x-6">
